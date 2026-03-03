@@ -60,6 +60,18 @@
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border-color, rgba(255, 255, 255, 0.05));
   }
+
+  .sidebar-content-fade {
+    transition: opacity var(--duration-premium) var(--ease-premium), transform var(--duration-premium) var(--ease-premium);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .sidebar-transition {
+    transition-property: width, margin, padding, transform, opacity;
+    transition-duration: var(--duration-premium);
+    transition-timing-function: var(--ease-premium);
+  }
 }
 
 @layer base {
@@ -73,6 +85,9 @@
     --sp-lg: 1.618rem;
     --sp-xl: 2.618rem;
     --sp-xxl: 4.236rem;
+
+    --ease-premium: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-premium: 800ms;
 
     --background: 220 25% 5%;
     --foreground: 220 15% 90%;
@@ -307,7 +322,9 @@
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300 ease-out;
+    @apply glass-card transition-all;
+    transition-duration: var(--duration-premium);
+    transition-timing-function: var(--ease-premium);
   }
 
   .glass-card-hover:hover {
@@ -334,7 +351,9 @@
   }
 
   .sidebar-item {
-    @apply flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] font-semibold transition-all duration-300;
+    @apply flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] font-semibold transition-all;
+    transition-duration: var(--duration-premium);
+    transition-timing-function: var(--ease-premium);
     color: hsl(var(--sidebar-foreground));
     border: 1px solid transparent;
   }
@@ -369,7 +388,9 @@
   }
 
   .btn-primary {
-    @apply rounded-lg px-5 py-2.5 font-semibold text-sm text-primary-foreground transition-all duration-200;
+    @apply rounded-lg px-5 py-2.5 font-semibold text-sm text-primary-foreground transition-all;
+    transition-duration: var(--duration-premium);
+    transition-timing-function: var(--ease-premium);
     background: var(--gradient-primary);
   }
 
@@ -377,6 +398,10 @@
     opacity: 0.9;
     transform: translateY(-1px);
     box-shadow: 0 4px 16px hsl(var(--primary) / 0.25);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.98);
   }
 
   .btn-primary:disabled {
@@ -419,13 +444,13 @@
 
 @layer utilities {
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn var(--duration-premium) var(--ease-premium) forwards;
   }
 
   @keyframes fadeIn {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(12px) scale(0.99);
     }
 
     to {
