@@ -6,6 +6,24 @@ import {
 import {
   RadialBarChart, RadialBar, ResponsiveContainer,
 } from "recharts";
+import { useEffect, useState } from "react";
+
+const CinematicValue = ({ target }: { target: number }) => {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const duration = 2000;
+    const stepTime = Math.abs(Math.floor(duration / target));
+    if (target === 0) return;
+    const timer = setInterval(() => {
+      start += 1;
+      setCount(start);
+      if (start === target) clearInterval(timer);
+    }, stepTime);
+    return () => clearInterval(timer);
+  }, [target]);
+  return <>{count}</>;
+};
 
 const ScoreCard = ({ label, value, icon: Icon, colorVar, description }: {
   label: string; value: number; icon: React.ElementType; colorVar: string; description: string;
@@ -13,23 +31,25 @@ const ScoreCard = ({ label, value, icon: Icon, colorVar, description }: {
   const color = `hsl(var(${colorVar}))`;
   const data = [{ value, fill: color }];
   return (
-    <div className="glass-card flex flex-col items-center text-center py-[var(--sp-lg)] px-[var(--sp-lg)] relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: color }} />
+    <div className="glass-card flex flex-col items-center text-center py-[var(--sp-lg)] px-[var(--sp-lg)] relative overflow-hidden group">
+      <div className="absolute top-0 left-0 right-0 h-[2px] transition-all duration-1000 group-hover:h-[4px]" style={{ background: color }} />
       <div className="relative w-20 h-20 mb-3">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" data={data} startAngle={90} endAngle={-270}>
-            <RadialBar background={{ fill: "hsl(var(--muted))" }} dataKey="value" cornerRadius={10} max={100} />
+            <RadialBar background={{ fill: "hsl(var(--muted))" }} dataKey="value" cornerRadius={10} max={100} animationDuration={1500} />
           </RadialBarChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold tabular-nums" style={{ color }}>{value}</span>
+          <span className="text-lg font-bold tabular-nums animate-fade-in" style={{ color }}>
+            <CinematicValue target={value} />
+          </span>
         </div>
       </div>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className="h-3.5 w-3.5" style={{ color }} />
-        <span className="text-xs font-semibold text-foreground">{label}</span>
+        <span className="text-xs font-semibold text-foreground uppercase tracking-widest">{label}</span>
       </div>
-      <p className="text-[10px] text-muted-foreground leading-tight">{description}</p>
+      <p className="text-[10px] text-muted-foreground leading-tight opacity-70">{description}</p>
     </div>
   );
 };
@@ -83,12 +103,12 @@ const Dashboard = () => {
           </div>
           <button
             onClick={() => navigate(floorPlanSaved ? "/visualizer" : "/land-intelligence")}
-            className="btn-primary flex items-center gap-3 px-8 py-4 whitespace-nowrap shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]"
+            className="btn-primary shimmer-glide flex items-center gap-3 px-8 py-4 whitespace-nowrap shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] group"
           >
             <span className="uppercase tracking-widest font-black text-xs">
               {floorPlanSaved ? "Enter Visualizer Studio" : "Begin Discovery Phase"}
             </span>
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </button>
         </div>
       </div>
@@ -103,10 +123,18 @@ const Dashboard = () => {
           <span className="text-[10px] text-muted-foreground opacity-50 uppercase tracking-widest font-bold">Real-time Syncing</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-[var(--sp-lg)]">
-          <ScoreCard label="Project Health" value={floorPlanSaved ? 72 : 0} icon={Activity} colorVar="--score-health" description="Overall project viability & synergy" />
-          <ScoreCard label="Structural Safety" value={floorPlanSaved ? 85 : 0} icon={Shield} colorVar="--score-structural" description="Seismic & load distribution factor" />
-          <ScoreCard label="Vastu Compliance" value={floorPlanSaved ? 68 : 0} icon={Compass} colorVar="--score-vastu" description="Traditional alignment precision" />
-          <ScoreCard label="Budget Stability" value={floorPlanSaved ? 91 : 0} icon={Wallet} colorVar="--score-budget" description="Financial confidence & BOQ health" />
+          <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <ScoreCard label="Project Health" value={floorPlanSaved ? 72 : 0} icon={Activity} colorVar="--score-health" description="Overall project viability & synergy" />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <ScoreCard label="Structural Safety" value={floorPlanSaved ? 85 : 0} icon={Shield} colorVar="--score-structural" description="Seismic & load distribution factor" />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
+            <ScoreCard label="Vastu Compliance" value={floorPlanSaved ? 68 : 0} icon={Compass} colorVar="--score-vastu" description="Traditional alignment precision" />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '400ms' }}>
+            <ScoreCard label="Budget Stability" value={floorPlanSaved ? 91 : 0} icon={Wallet} colorVar="--score-budget" description="Financial confidence & BOQ health" />
+          </div>
         </div>
       </div>
 
@@ -117,10 +145,18 @@ const Dashboard = () => {
           Journey Milestones
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[var(--sp-lg)]">
-          <QuickAction label="Phase 01: Site Discovery" description="Plot risks, soil analysis, geo-intelligence" icon={MapPin} path="/land-intelligence" />
-          <QuickAction label="Phase 02: Space Planning" description="Room configuration & functional layout" icon={Grid3X3} path="/floor-plan" />
-          <QuickAction label="Phase 03: Visual Studio" description="Consolidated Structural & Aesthetic 3D" icon={Box} path="/visualizer" locked={!floorPlanSaved} />
-          <QuickAction label="Phase 04: Delivery Core" description="Certified Reports & Compliance Export" icon={FileText} path="/reports" locked={!floorPlanSaved} />
+          <div className="animate-fade-in" style={{ animationDelay: '500ms' }}>
+            <QuickAction label="Phase 01: Site Discovery" description="Plot risks, soil analysis, geo-intelligence" icon={MapPin} path="/land-intelligence" />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '600ms' }}>
+            <QuickAction label="Phase 02: Space Planning" description="Room configuration & functional layout" icon={Grid3X3} path="/floor-plan" />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '700ms' }}>
+            <QuickAction label="Phase 03: Visual Studio" description="Consolidated Structural & Aesthetic 3D" icon={Box} path="/visualizer" locked={!floorPlanSaved} />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '800ms' }}>
+            <QuickAction label="Phase 04: Delivery Core" description="Certified Reports & Compliance Export" icon={FileText} path="/reports" locked={!floorPlanSaved} />
+          </div>
         </div>
       </div>
 

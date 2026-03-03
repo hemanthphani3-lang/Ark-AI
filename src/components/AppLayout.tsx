@@ -9,7 +9,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 selection:text-white">
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 selection:text-white relative">
+      <div className="luxury-mesh-bg" />
       <AppSidebar collapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
       <div
         className={`${isSidebarCollapsed ? "ml-[60px]" : "ml-72"} sidebar-transition min-h-screen flex flex-col`}
