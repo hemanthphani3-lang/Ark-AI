@@ -1,5 +1,5 @@
 import { useAppState } from "@/context/AppContext";
-import { FileText, Coins, Shield, Compass, CheckSquare, Download, AlertTriangle, TrendingUp, Home } from "lucide-react";
+import { FileText, Coins, Shield, Compass, CheckSquare, Download, AlertTriangle, TrendingUp, Home, Box } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -173,6 +173,52 @@ const ReportsPage = () => {
         </div>
       </div>
 
+      {/* Material Requirements Section */}
+      <div className="glass-card">
+        <div className="flex items-center justify-between mb-5">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Box className="h-3 w-3" /> Material Requirements (BOQ)
+          </h4>
+          <span className="text-[9px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-tighter">
+            Estimated quantities
+          </span>
+        </div>
+        <div className="space-y-8">
+          {['structural', 'plumbing', 'electrical', 'painting', 'finishing', 'other'].map((cat) => {
+            const catMats = state.materialRequirements.filter(m => m.category === cat);
+            if (catMats.length === 0) return null;
+
+            return (
+              <div key={cat} className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: COST_COLORS[cat] || 'var(--primary)' }} />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-foreground/70">
+                    {cat} Requirements
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {catMats.map((mat) => (
+                    <div key={mat.id} className="p-3 rounded-xl border border-border bg-muted/10 hover:bg-muted/20 transition-all group">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{mat.name}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xl font-black text-foreground tabular-nums">{mat.quantity.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground">{mat.unit}</span>
+                      </div>
+                      <div className="mt-2 flex justify-between items-center opacity-60 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[9px] font-medium text-muted-foreground">₹{mat.rate} / {mat.unit.slice(0, -1) || mat.unit}</span>
+                        <span className="text-[10px] font-bold text-foreground">₹{mat.total.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Intelligence Scores */}
       <div className="glass-card">
         <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-5 flex items-center gap-2">
@@ -228,9 +274,9 @@ const ReportsPage = () => {
                 <span className="text-xs font-medium text-foreground flex-1">{room.name}</span>
                 <span className="text-[10px] font-mono text-muted-foreground">{Math.round(room.area)} ft²</span>
                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${room.zone === 'public' ? 'bg-primary/10 text-primary' :
-                    room.zone === 'service' ? 'bg-warning/10 text-warning' :
-                      room.zone === 'core' ? 'bg-muted text-muted-foreground' :
-                        'bg-success/10 text-success'
+                  room.zone === 'service' ? 'bg-warning/10 text-warning' :
+                    room.zone === 'core' ? 'bg-muted text-muted-foreground' :
+                      'bg-success/10 text-success'
                   }`}>{room.zone}</span>
               </div>
             ))}

@@ -6,44 +6,81 @@ import Markdown from "react-markdown";
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 /* ─── Local Fallback AI ─── */
-function getLocalAnswer(userText: string, ctx: {
-  hasFloorPlan: boolean; rooms: number; floors: number; plotSize: number;
-  totalCost: number; compliance: string; scores: { structural: number; circulation: number; vastu: number; cost: number };
-}): string {
+function getLocalAnswer(userText: string, ctx: any): string {
   const q = userText.toLowerCase();
 
   if (q.includes("cost") || q.includes("price") || q.includes("budget") || q.includes("estimat")) {
     if (!ctx.hasFloorPlan) return "Generate a floor plan first to get accurate cost estimates. Use the **Floor Planning** module to set your plot dimensions and rooms.";
-    return `Based on your **${ctx.plotSize} sq ft** plan across **${ctx.floors} floor(s)**:\n\n💰 **Total Estimated Cost: ₹${ctx.totalCost.toLocaleString()}**\n\n- Foundation & Structure: ~40% of total\n- Electrical & Plumbing: ~12%\n- Flooring & Finishes: ~30%\n- Miscellaneous: ~8%\n\n> Costs are area-indexed and may vary by material grade and contractor rates.`;
+    const breakdown = ctx.costBreakdown;
+    return `Based on your **${ctx.plotSize} sq ft** plan across **${ctx.floors} floor(s)**:
+
+💰 **Total Estimated Cost: ₹${ctx.totalCost.toLocaleString()}**
+
+**Breakdown:**
+- Structure & Foundation: ₹${(breakdown.foundation + breakdown.structural).toLocaleString()}
+- Finishing & Painting: ₹${(breakdown.finishing + breakdown.painting).toLocaleString()}
+- MEP (Elec/Plumb): ₹${(breakdown.electrical + breakdown.plumbing).toLocaleString()}
+- Others: ₹${(breakdown.miscellaneous).toLocaleString()}
+
+> Costs are area-indexed based on current material rates.`;
   }
 
   if (q.includes("room") || q.includes("bedroom") || q.includes("floor plan") || q.includes("layout")) {
     if (!ctx.hasFloorPlan) return "You haven't generated a floor plan yet. Go to **Floor Planning** to configure your plot dimensions and room layout. I'll analyze it once it's ready!";
-    return `Your current plan has **${ctx.rooms} rooms** across **${ctx.floors} floor(s)** on **${ctx.plotSize} sq ft**.\n\n**Zone Summary:**\n- Living Room is the central circulation hub\n- Bathrooms are clustered in the wet core for plumbing efficiency\n- Private zones are positioned away from street-facing areas\n\nWould you like tips on optimizing any specific room?`;
+    const roomList = ctx.floorPlan.map((r: any) => `- **${r.name}**: ${r.width.toFixed(1)}' x ${r.height.toFixed(1)}' (${r.area.toFixed(1)} sq ft)`).join("\n");
+    return `Your current plan has **${ctx.rooms} rooms** across **${ctx.floors} floor(s)** on **${ctx.plotSize} sq ft** plot.
+
+**Detailed Room List:**
+${roomList}
+
+**Zone Summary:**
+- Central circulation is handled via ${ctx.floorPlan.find((r: any) => r.name.includes("Living")) ? "the Living Room hub" : "a central corridor"}.
+- Wet areas (Bathrooms/Kitchen) are ${ctx.floorPlan.filter((r: any) => r.isWetArea).length > 0 ? "identified for plumbing optimization" : "pending placement"}.`;
   }
 
-  if (q.includes("vastu") || q.includes("direction") || q.includes("north") || q.includes("east") || q.includes("facing")) {
-    return `**Vastu Basics for Residential Design:**\n\n🏠 **Key Placements:**\n- **Kitchen** → Southeast (fire element)\n- **Master Bedroom** → Southwest (earth stability)\n- **Pooja Room** → Northeast (spiritual energy)\n- **Living Room** → North or East (open energy)\n- **Bathroom** → Northwest (air element)\n\nYour Vastu score is **${ctx.scores.vastu}/100**. Visit the **Vastu Engine** module for a detailed room-by-room analysis.`;
+  if (q.includes("vastu") || q.includes("direction") || q.includes("facing")) {
+    return `**Vastu Intelligence Report:**
+- **Project Facing:** ${ctx.projectMeta.facing}
+- **Vastu Mode:** ${ctx.projectMeta.vastuMode}
+- **Current Score:** ${ctx.scores.vastu}/100
+
+🏠 **Key Placements Recommendation:**
+- **Kitchen** → Southeast (fire)
+- **Master Bedroom** → Southwest (stability)
+- **Pooja Room** → Northeast (spiritual)
+
+Visit the **Vastu Engine** module for a detailed room-by-room analysis based on your ${ctx.projectMeta.facing} facing plot.`;
   }
 
-  if (q.includes("structure") || q.includes("structural") || q.includes("safe") || q.includes("foundation") || q.includes("column")) {
-    return `**Structural Intelligence Report:**\n\n🏗️ Structural Safety Score: **${ctx.scores.structural}/100**\n\n- Columns recommended: every 10-12 ft on a structural grid\n- For multi-floor buildings (G+1+), a **Dog-leg or U-shape staircase** core is reserved\n- Raft foundation recommended for plots under 1200 sq ft\n- Seismic Zone II-III compliance is auto-applied\n\nCheck the **Structural Analysis** module for a full report.`;
+  if (q.includes("structure") || q.includes("safe") || q.includes("compliance")) {
+    return `**Safety & Compliance Report:**
+- **Structural Score:** ${ctx.scores.structural}/100
+- **Compliance status:** ${ctx.compliance}
+- **FAR Ratio:** Checked against bylaws for ${ctx.plotSize} sq ft.
+
+🏗️ Structural Advice:
+- Column grid is optimized for ${ctx.plotSize < 1200 ? "residential G+1" : "independent villa"} loads.
+- Staircase core is structurally centralized for stability.`;
   }
 
-  if (q.includes("compliance") || q.includes("regulation") || q.includes("bylaw") || q.includes("permit") || q.includes("legal")) {
-    return `**Compliance Status: ${ctx.compliance}**\n\n📋 Key regulations checked:\n- ✅ Minimum plot size (600 sq ft)\n- ✅ Ground coverage (max 75%)\n- ✅ Setback requirements\n- ✅ Floor Area Ratio (FAR ≤ 2.5)\n- ${ctx.plotSize >= 800 ? "✅" : "❌"} Parking provision\n\nVisit the **Compliance Check** module for your full regulation report.`;
-  }
+  if (q.includes("hello") || q.includes("hi") || q.includes("help")) {
+    return `👋 Hello! I'm **ArkAI Co-Pilot**. I have full access to your project data.
 
-  if (q.includes("hello") || q.includes("hi") || q.includes("hey") || q.includes("help")) {
-    return `👋 Hello! I'm **ArkAI Co-Pilot** — your intelligent construction assistant.\n\nI can help you with:\n- 📐 **Floor plan** optimization\n- 💰 **Cost estimations** and budget planning\n- 🏗️ **Structural safety** guidance\n- 🧭 **Vastu compliance** advice\n- 📋 **Building regulations** and compliance\n\n${ctx.hasFloorPlan ? `Your current project: **${ctx.plotSize} sq ft**, ${ctx.rooms} rooms, ${ctx.floors} floors.` : "Start by generating a floor plan to unlock full AI analysis."}\n\nWhat would you like to know?`;
-  }
+Current Snapshot:
+- **Plot:** ${ctx.plotSize} sq ft, ${ctx.projectMeta.facing} facing
+- **Layout:** ${ctx.rooms} rooms, ${ctx.floors} floors
+- **Cost:** ₹${ctx.totalCost.toLocaleString()}
+- **Compliance:** ${ctx.compliance}
 
-  if (q.includes("stair") || q.includes("staircase")) {
-    return `**Staircase Guidance:**\n\n🪜 For **G+1 or higher** buildings, a dedicated staircase core is mandatory.\n\nTypes available in ArkAI:\n- **Dog-leg** (most common, space-efficient)\n- **U-shape** (for larger plots)\n- **L-shape** (corner plots)\n- **Straight** (minimal footprint)\n\nThe staircase core is reserved before room placement to ensure structural alignment.`;
+What specific part of your design can I help you optimize?`;
   }
 
   // Generic response
-  return `I'm your **ArkAI Co-Pilot** 🏗️\n\n${ctx.hasFloorPlan ? `Your current plan: **${ctx.plotSize} sq ft**, ${ctx.rooms} rooms, ${ctx.floors} floor(s). Total cost estimate: **₹${ctx.totalCost.toLocaleString()}**.\n\n` : ""}I can answer questions about:\n- Cost & budget\n- Room layouts & floor planning\n- Structural safety\n- Vastu compliance\n- Building regulations\n\nWhat would you like to know about your project?`;
+  return `I'm your **ArkAI Co-Pilot** 🏗️
+
+${ctx.hasFloorPlan ? `I've analyzed your **${ctx.plotSize} sq ft** project. It has **${ctx.rooms} rooms** with a total cost estimate of **₹${ctx.totalCost.toLocaleString()}**.` : "I can help with planning once you start your floor plan."}
+
+I can answer questions about specific room sizes, Vastu placements, or cost breakdowns. What would you like to know?`;
 }
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -120,12 +157,16 @@ export default function FloatingChatbot() {
 
   const buildCtx = () => ({
     hasFloorPlan: context.hasFloorPlan,
+    floorPlan: context.floorPlan,
     rooms: context.floorPlan.length,
     floors: context.floorConfig?.numFloors || 1,
     plotSize: context.plotSize,
     totalCost: context.state.estimatedCost,
+    costBreakdown: context.state.costBreakdown,
     compliance: context.state.complianceStatus,
     scores: context.state.scores,
+    projectMeta: context.state.projectMeta,
+    materialRequirements: context.state.materialRequirements,
   });
 
   const send = async () => {
@@ -144,10 +185,36 @@ export default function FloatingChatbot() {
     const allMessages: Msg[] = chatMessages
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
-    const ctxInfo = context.hasFloorPlan
-      ? `[Project: ${context.plotSize} sqft, ${context.floorPlan.length} rooms, ${context.floorConfig?.numFloors || 1} floors, Cost: ₹${context.state.estimatedCost.toLocaleString()}]`
-      : "[No floor plan yet]";
-    allMessages.push({ role: "user", content: `${ctxInfo}\n\n${text}` });
+
+    const fullCtx = buildCtx();
+    const ctxString = JSON.stringify({
+      plot_info: { size: fullCtx.plotSize, width: context.plotWidth, height: context.plotHeight },
+      project_meta: fullCtx.projectMeta,
+      stats: {
+        rooms: fullCtx.rooms,
+        floors: fullCtx.floors,
+        total_cost: fullCtx.totalCost,
+        scores: fullCtx.scores,
+        compliance: fullCtx.compliance,
+      },
+      detailed_rooms: fullCtx.floorPlan.map(r => ({
+        name: r.name,
+        area: r.area,
+        floor: r.floor,
+        zone: r.zone,
+        is_wet_area: r.isWetArea
+      })),
+      cost_breakdown: fullCtx.costBreakdown,
+      material_requirements: fullCtx.materialRequirements.map(m => ({
+        name: m.name,
+        quantity: m.quantity,
+        unit: m.unit,
+        total_cost: m.total
+      }))
+    });
+
+    const userInjectedContent = `[SYSTEM CONTEXT: ${ctxString}]\n\nUSER QUESTION: ${text}`;
+    allMessages.push({ role: "user", content: userInjectedContent });
 
     const upsert = (chunk: string) => {
       assistantRef.current += chunk;

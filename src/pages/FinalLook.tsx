@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Environment, ContactShadows, PointerLockControls } from "@react-three/drei";
+import { OrbitControls, Text, Environment, ContactShadows, PointerLockControls, Sky } from "@react-three/drei";
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as THREE from "three";
 import { useAppState, BIMLayer, RoomData, BIMModel } from '../context/AppContext';
@@ -7,8 +7,11 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Paintbrush, Sun, Moon, Footprints, Shield, Layers, Eye, EyeOff, Rotate3d } from "lucide-react";
 
 const WALL_HEIGHT = 0.9; // 9ft (scale: 0.1 = 1ft)
+const DOOR_HEIGHT = 0.7; // 7ft
 const SLAB_HEIGHT = 0.1; // 1ft slab thickness
 const WALL_THICKNESS = 0.06; // ~7 inches
+const TRIM_HEIGHT = 0.04; // ~5 inch baseboard
+const TRIM_THICKNESS = 0.01; // ~1 inch thick trim
 
 const PAINT_THEMES: Record<string, { name: string; walls: string; accent: string; floor: string; roof: string; trim: string }> = {
   modern: { name: "Midnight Navy", walls: "#1e293b", accent: "#3b82f6", floor: "#c4a882", roof: "#0f172a", trim: "#94a3b8" },
@@ -16,6 +19,10 @@ const PAINT_THEMES: Record<string, { name: string; walls: string; accent: string
   forest: { name: "Emerald Forest", walls: "#064e3b", accent: "#10b981", floor: "#78350f", roof: "#022c22", trim: "#34d399" },
   warm: { name: "Warm Terracotta", walls: "#7c2d12", accent: "#f97316", floor: "#8b6914", roof: "#451a03", trim: "#fbbf24" },
   scandi: { name: "Nordic Slate", walls: "#f8fafc", accent: "#475569", floor: "#94a3b8", roof: "#1e293b", trim: "#cbd5e1" },
+  minimalist: { name: "Zen White", walls: "#fdfcf0", accent: "#d4d4d4", floor: "#e5e5e5", roof: "#262626", trim: "#a3a3a3" },
+  oceanic: { name: "Deep Sea", walls: "#0f172a", accent: "#0ea5e9", floor: "#0c4a6e", roof: "#020617", trim: "#38bdf8" },
+  industrial: { name: "Urban Concrete", walls: "#404040", accent: "#ef4444", floor: "#171717", roof: "#0a0a0a", trim: "#d1d5db" },
+  desert: { name: "Sand & Clay", walls: "#d6b591", accent: "#9a3412", floor: "#78350f", roof: "#431407", trim: "#c2410c" },
 };
 
 const ROOM_PAINT: Record<string, string> = {
@@ -353,9 +360,11 @@ function FurnishedRoom({ room, scale, offsetX, offsetZ, theme, allRooms, isLayer
 
           if (globalMaxT > globalMinT) {
             const overlapLen = globalMaxT - globalMinT;
-            // Standard residential door is ~3ft (0.3 units). 
-            // If overlap is too small, use half; otherwise use standard 0.3.
-            const dWidth = overlapLen < 0.3 ? overlapLen / 2 : 0.3;
+            // External connections (to Balconies, Terraces, etc.) are 2x interior (1.2 units)
+            const isExternalConnection = isOpenSpaceRoom(other.name);
+            const DOOR_STD = isExternalConnection ? 1.2 : 0.6;
+
+            const dWidth = overlapLen < DOOR_STD ? overlapLen / 2 : DOOR_STD;
             doors.push({
               doorCenterT: (globalMinT + globalMaxT) / 2,
               doorWidth: dWidth
@@ -392,6 +401,8 @@ function FurnishedRoom({ room, scale, offsetX, offsetZ, theme, allRooms, isLayer
           <meshStandardMaterial color={themeData.floor} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
         </mesh>
       )}
+
+
       {!isOpenSpace && (() => {
         let bathroomDoorCarved = false;
         const isBathroom = isBathroomRoom(room.name);
@@ -452,7 +463,7 @@ function FurnishedRoom({ room, scale, offsetX, offsetZ, theme, allRooms, isLayer
           });
 
           if (isExteriorFallbackDoor) {
-            const DOOR_W = 0.35; // Standard exterior door ~3.5ft
+            const DOOR_W = 1.2; // Standard exterior door (2x interior 0.6 = 1.2)
             doorSpans.push({ startT: seg.length / 2 - DOOR_W / 2, endT: seg.length / 2 + DOOR_W / 2 });
           }
 
@@ -476,53 +487,116 @@ function FurnishedRoom({ room, scale, offsetX, offsetZ, theme, allRooms, isLayer
                 const pLen = pillar.endT - pillar.startT;
                 const pCenter = (pillar.startT + pillar.endT) / 2 - seg.length / 2;
                 return (
-                  <mesh key={pIdx} position={[pCenter, 0, 0]} castShadow>
-                    <boxGeometry args={[pLen + (pIdx === 0 || pIdx === wallPillars.length - 1 ? WALL_THICKNESS : 0), WALL_HEIGHT, WALL_THICKNESS]} />
-                    <meshStandardMaterial color={wallColor} roughness={0.8} />
-                  </mesh>
+                  <group key={pIdx}>
+                    <mesh position={[pCenter, 0, 0]} castShadow>
+                      <boxGeometry args={[pLen + (pIdx === 0 || pIdx === wallPillars.length - 1 ? WALL_THICKNESS : 0), WALL_HEIGHT, WALL_THICKNESS]} />
+                      <meshStandardMaterial color={wallColor} roughness={0.9} metalness={0.05} />
+                    </mesh>
+                    {/* Baseboards */}
+                    <mesh position={[pCenter, -WALL_HEIGHT / 2 + TRIM_HEIGHT / 2 + 0.005, WALL_THICKNESS / 2 + TRIM_THICKNESS / 2]} castShadow>
+                      <boxGeometry args={[pLen, TRIM_HEIGHT, TRIM_THICKNESS]} />
+                      <meshStandardMaterial color={themeData.trim} roughness={0.6} metalness={0.1} />
+                    </mesh>
+                    <mesh position={[pCenter, -WALL_HEIGHT / 2 + TRIM_HEIGHT / 2 + 0.005, -WALL_THICKNESS / 2 - TRIM_THICKNESS / 2]} castShadow>
+                      <boxGeometry args={[pLen, TRIM_HEIGHT, TRIM_THICKNESS]} />
+                      <meshStandardMaterial color={themeData.trim} roughness={0.6} metalness={0.1} />
+                    </mesh>
+                    {/* Crown Molding (Only for interior-facing walls) */}
+                    {!isExterior && (
+                      <>
+                        <mesh position={[pCenter, WALL_HEIGHT / 2 - TRIM_HEIGHT / 2 - 0.005, WALL_THICKNESS / 2 + TRIM_THICKNESS / 2]} castShadow>
+                          <boxGeometry args={[pLen, TRIM_HEIGHT * 1.2, TRIM_THICKNESS * 1.5]} />
+                          <meshStandardMaterial color={themeData.trim} roughness={0.5} />
+                        </mesh>
+                        <mesh position={[pCenter, WALL_HEIGHT / 2 - TRIM_HEIGHT / 2 - 0.005, -WALL_THICKNESS / 2 - TRIM_THICKNESS / 2]} castShadow>
+                          <boxGeometry args={[pLen, TRIM_HEIGHT * 1.2, TRIM_THICKNESS * 1.5]} />
+                          <meshStandardMaterial color={themeData.trim} roughness={0.5} />
+                        </mesh>
+                      </>
+                    )}
+                  </group>
+                );
+              })}
+              {/* Door headers and frames */}
+              {doorSpans.map((span, sIdx) => {
+                const hLen = span.endT - span.startT;
+                const hCenter = (span.startT + span.endT) / 2 - seg.length / 2;
+                const headerHeight = WALL_HEIGHT - DOOR_HEIGHT;
+                const headerY = DOOR_HEIGHT / 2;
+                return (
+                  <group key={`h-${sIdx}`}>
+                    {/* The actual header wall */}
+                    <mesh position={[hCenter, headerY, 0]} castShadow>
+                      <boxGeometry args={[hLen, headerHeight, WALL_THICKNESS]} />
+                      <meshStandardMaterial color={wallColor} roughness={0.9} metalness={0.05} />
+                    </mesh>
+
+                    {/* Door Frame/Casing and Jambs - Only for standard doors, skip for wide archways */}
+                    {hLen < 1.3 && (
+                      <>
+                        {/* The horizontal casing at the top of the door opening */}
+                        <mesh position={[hCenter, DOOR_HEIGHT - WALL_HEIGHT / 2, 0]} castShadow>
+                          <boxGeometry args={[hLen + 0.04, 0.03, WALL_THICKNESS + 0.03]} />
+                          <meshStandardMaterial color={themeData.trim} roughness={0.4} metalness={0.2} />
+                        </mesh>
+                        {/* Side Jambs */}
+                        <mesh position={[hCenter - hLen / 2, DOOR_HEIGHT / 2 - WALL_HEIGHT / 2, 0]} castShadow>
+                          <boxGeometry args={[0.03, DOOR_HEIGHT, WALL_THICKNESS + 0.025]} />
+                          <meshStandardMaterial color={themeData.trim} roughness={0.4} metalness={0.2} />
+                        </mesh>
+                        <mesh position={[hCenter + hLen / 2, DOOR_HEIGHT / 2 - WALL_HEIGHT / 2, 0]} castShadow>
+                          <boxGeometry args={[0.03, DOOR_HEIGHT, WALL_THICKNESS + 0.025]} />
+                          <meshStandardMaterial color={themeData.trim} roughness={0.4} metalness={0.2} />
+                        </mesh>
+                      </>
+                    )}
+                  </group>
                 );
               })}
             </group>
           );
         });
-      })()}
+      })()
+      }
       <Text position={[cx - offsetX, 0.06, cz - offsetZ]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.15} color="#555" anchorX="center" anchorY="middle">
         {room.name}
       </Text>
-      {room.name.toLowerCase().includes("staircase") && room.floor < allRooms.reduce((max, r) => Math.max(max, r.floor || 0), 0) && (() => {
-        const nx = room.x * scale - offsetX;
-        const nz = room.y * scale - offsetZ;
-        const nw = room.width * scale;
-        const nd = room.height * scale;
-        const isWider = nw > nd;
-        const length = isWider ? nw : nd;
-        const angle = Math.atan2(1.0, length);
-        const hypotenuse = Math.sqrt(length * length + 1.0 * 1.0);
-        return (
-          <group position={[nx + nw / 2, 0, nz + nd / 2]}>
-            <mesh name="stair-slope" position={[0, 0.5, 0]} rotation={[isWider ? 0 : -angle, 0, isWider ? angle : 0]} castShadow>
-              <boxGeometry args={[isWider ? hypotenuse : nw * 0.9, 0.04, isWider ? nd * 0.9 : hypotenuse]} />
-              <meshStandardMaterial color={themeData.floor} roughness={0.9} transparent opacity={0.1} />
-            </mesh>
-            {Array.from({ length: 10 }).map((_, i) => {
-              const stepProgress = i / 10;
-              const stepW = isWider ? nw / 10 : nw * 0.9;
-              const stepD = isWider ? nd * 0.9 : nd / 10;
-              const stepH = 0.1;
-              const stepX = isWider ? (-nw / 2 + stepW / 2 + i * stepW) : 0;
-              const stepZ = isWider ? 0 : (-nd / 2 + stepD / 2 + i * stepD);
-              const stepY = stepProgress * 1.0;
-              return (
-                <mesh key={i} name="walkable-floor" position={[stepX, stepY + stepH / 2, stepZ]} castShadow>
-                  <boxGeometry args={[stepW, stepH, stepD]} />
-                  <meshStandardMaterial color={themeData.floor} roughness={0.8} />
-                </mesh>
-              );
-            })}
-          </group>
-        );
-      })()}
-    </group>
+      {
+        room.name.toLowerCase().includes("staircase") && room.floor < allRooms.reduce((max, r) => Math.max(max, r.floor || 0), 0) && (() => {
+          const nx = room.x * scale - offsetX;
+          const nz = room.y * scale - offsetZ;
+          const nw = room.width * scale;
+          const nd = room.height * scale;
+          const isWider = nw > nd;
+          const length = isWider ? nw : nd;
+          const angle = Math.atan2(1.0, length);
+          const hypotenuse = Math.sqrt(length * length + 1.0 * 1.0);
+          return (
+            <group position={[nx + nw / 2, 0, nz + nd / 2]}>
+              <mesh name="stair-slope" position={[0, 0.5, 0]} rotation={[isWider ? 0 : -angle, 0, isWider ? angle : 0]} castShadow>
+                <boxGeometry args={[isWider ? hypotenuse : nw * 0.9, 0.04, isWider ? nd * 0.9 : hypotenuse]} />
+                <meshStandardMaterial color={themeData.floor} roughness={0.9} transparent opacity={0.1} />
+              </mesh>
+              {Array.from({ length: 10 }).map((_, i) => {
+                const stepProgress = i / 10;
+                const stepW = isWider ? nw / 10 : nw * 0.9;
+                const stepD = isWider ? nd * 0.9 : nd / 10;
+                const stepH = 0.1;
+                const stepX = isWider ? (-nw / 2 + stepW / 2 + i * stepW) : 0;
+                const stepZ = isWider ? 0 : (-nd / 2 + stepD / 2 + i * stepD);
+                const stepY = stepProgress * 1.0;
+                return (
+                  <mesh key={i} name="walkable-floor" position={[stepX, stepY + stepH / 2, stepZ]} castShadow>
+                    <boxGeometry args={[stepW, stepH, stepD]} />
+                    <meshStandardMaterial color={themeData.floor} roughness={0.8} />
+                  </mesh>
+                );
+              })}
+            </group>
+          );
+        })()
+      }
+    </group >
   );
 }
 
@@ -560,11 +634,18 @@ function FinishedBuilding({ rooms, numFloors, theme, customWindows, isLayerVisib
 
   return (
     <group>
-      {/* Ground with grass texture */}
-      <mesh name="walkable-floor" position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[pw + 10, ph + 10]} />
-        <meshStandardMaterial color="#4a7c59" roughness={0.9} side={THREE.DoubleSide} />
-      </mesh>
+      {/* Ground with grass texture and depth */}
+      <group position={[0, -0.05, 0]}>
+        <mesh name="walkable-floor" position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[pw + 30, ph + 30]} />
+          <meshStandardMaterial color="#2d4a22" roughness={1} metalness={0} />
+        </mesh>
+        {/* Foundation/Soil depth - lowered slightly to avoid Z-fighting */}
+        <mesh position={[0, -0.25, 0]}>
+          <boxGeometry args={[pw + 30.1, 0.5, ph + 30.1]} />
+          <meshStandardMaterial color="#3d2b1f" roughness={1} />
+        </mesh>
+      </group>
 
       {/* Pathway */}
       <mesh name="walkable-floor" position={[0, -0.04, ph / 2 + 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -583,11 +664,18 @@ function FinishedBuilding({ rooms, numFloors, theme, customWindows, isLayerVisib
         >
           <mesh>
             <boxGeometry args={[0.3, 0.4, 0.04]} />
-            <meshStandardMaterial color="#87ceeb" opacity={0.6} transparent roughness={0.1} metalness={0.4} />
+            <meshPhysicalMaterial
+              color="#e0f0ff"
+              transmission={0.9}
+              thickness={0.05}
+              roughness={0.05}
+              envMapIntensity={1.5}
+              clearcoat={1}
+            />
           </mesh>
           <mesh position={[0, 0, 0.01]}>
             <boxGeometry args={[0.32, 0.42, 0.03]} />
-            <meshStandardMaterial color={themeData.trim} roughness={0.4} />
+            <meshStandardMaterial color={themeData.trim} roughness={0.3} metalness={0.5} />
           </mesh>
         </group>
       ))}
@@ -645,6 +733,13 @@ function FinishedBuilding({ rooms, numFloors, theme, customWindows, isLayerVisib
             {floorRooms.map((room) => (
               <FurnishedRoom key={room.id} room={room} scale={scaleFactor} offsetX={offsetX} offsetZ={offsetZ} theme={theme} allRooms={rooms} isLayerVisible={isLayerVisible} bimModel={bimModel} />
             ))}
+            {/* Interior Ceiling - slightly off-white for realism */}
+            {isLayerVisible('architectural') && (
+              <mesh position={[0, WALL_HEIGHT - 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <shapeGeometry args={[slabShape]} />
+                <meshStandardMaterial color="#fafafa" roughness={0.9} />
+              </mesh>
+            )}
           </group>
         );
       })}
@@ -864,16 +959,25 @@ const FinalLook = () => {
         <Canvas shadows camera={{ position: [camD, camD * 0.5, camD], fov: 45 }}>
           {lighting === "day" ? (
             <>
+              <hemisphereLight intensity={0.6} groundColor="#4a7c59" color="#cae9ff" />
               <ambientLight intensity={0.4} />
-              <directionalLight position={[8, 12, 6]} intensity={1} castShadow shadow-mapSize={1024} />
-              <pointLight position={[-4, 6, -4]} intensity={0.2} color="#ffd700" />
-              <Environment preset="city" />
+              <directionalLight position={[20, 30, 10]} intensity={1.8} castShadow
+                shadow-mapSize={[2048, 2048]}
+                shadow-camera-far={50}
+                shadow-camera-left={-20}
+                shadow-camera-right={20}
+                shadow-camera-top={20}
+                shadow-camera-bottom={-20}
+              />
+              <Sky sunPosition={[100, 20, 100]} />
+              <Environment preset="city" blur={0.8} />
             </>
           ) : (
             <>
-              <ambientLight intensity={0.15} />
-              <directionalLight position={[5, 8, 5]} intensity={0.3} color="#6b7fff" castShadow />
-              <pointLight position={[0, 3, 0]} intensity={0.5} color="#ffa500" distance={10} />
+              <hemisphereLight intensity={0.1} groundColor="#000000" color="#1e293b" />
+              <ambientLight intensity={0.1} />
+              <directionalLight position={[5, 15, 5]} intensity={0.4} color="#6b7fff" castShadow />
+              <pointLight position={[0, 4, 0]} intensity={0.8} color="#ffcc33" distance={15} decay={2} />
               <Environment preset="night" />
             </>
           )}

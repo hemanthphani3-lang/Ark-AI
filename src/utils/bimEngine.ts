@@ -7,6 +7,8 @@ export interface QTOReport {
     tileArea: number;       // m2
     paintArea: number;      // m2
     plumbingPoints: number;
+    totalArea: number;      // sqft
+    wetAreaCount: number;
 }
 
 export interface ClashWarning {
@@ -59,6 +61,16 @@ export function calculateQTO(floorPlan: RoomData[], bimModel: BIMModel): QTORepo
     });
 
     // Calculate Column Concrete
+    let totalAreaSqFt = 0;
+    let wetAreaCount = 0;
+
+    floorPlan.forEach(room => {
+        totalAreaSqFt += room.width * room.height;
+        if (room.isWetArea || room.name.toLowerCase().includes("bath") || room.name.toLowerCase().includes("toilet") || room.name.toLowerCase().includes("kitchen")) {
+            wetAreaCount++;
+        }
+    });
+
     Object.values(bimModel.columns).forEach(col => {
         const vol = (col.width || 0.1) * (col.depth || 0.1) * (col.height || 0.9) * Math.pow(FT_TO_M, 3);
         concreteVolume += vol;
@@ -73,7 +85,9 @@ export function calculateQTO(floorPlan: RoomData[], bimModel: BIMModel): QTORepo
         steelEstimate,
         tileArea,
         paintArea,
-        plumbingPoints
+        plumbingPoints,
+        totalArea: totalAreaSqFt,
+        wetAreaCount
     };
 }
 

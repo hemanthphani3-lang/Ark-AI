@@ -3,6 +3,7 @@ import { useAppState, RoomData, FloorConfig, CostBreakdown, BIMLayer, BIMModel, 
 import { Save, RotateCcw, Compass, ChevronRight, ChevronLeft, Shield, Activity, GraduationCap, Coins, Info, Layers, Layout, Plus, Trash2, Check, X, DoorOpen, Box, Ruler, Pipette, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { calculateQTO, detectClashes, QTOReport, ClashWarning } from "@/utils/bimEngine";
+import { calculateDetailedMaterials } from "@/utils/costEstimationEngine";
 import { runVastuAnalysis, getZoneRects, VastuFacing, VastuZone } from "@/utils/vastuEngine";
 
 const ROOM_COLORS = [
@@ -50,7 +51,7 @@ function organicRect(
   rx: number, ry: number, rw: number, rh: number, id: number,
   lockedEdges: { left?: boolean; top?: boolean; right?: boolean; bottom?: boolean } = {}
 ): { x: number; y: number }[] {
-  const j = (n: number) => jitter(0.3, id + n);
+  const j = (n: number) => jitter(0.05, id + n);
 
   // A corner is made of two edges. If either touching edge is locked, that axis is NOT jittered for that corner.
   // Corners: TL=[left,top], TR=[right,top], BR=[right,bottom], BL=[left,bottom]
@@ -267,7 +268,7 @@ const FloorPlanGenerator = () => {
     state, setProjectMeta, setScores, setCostBreakdown, setTotalRooms,
     setEstimatedCost, setFloorPlan, saveFloorPlan, floorPlanSaved,
     resetFloorPlan, setFloorConfig, landAnalysis, setBIMMode, setBIMLayerVisibility,
-    saveProject
+    saveProject, setMaterialRequirements
   } = useAppState();
   const navigate = useNavigate();
 
@@ -317,7 +318,12 @@ const FloorPlanGenerator = () => {
           flooring: Math.round(report.tileArea * 1200),
           painting: Math.round(report.paintArea * 450),
         });
-        setEstimatedCost(Math.round(report.brickVolume * 5500 + report.concreteVolume * 12000 + report.tileArea * 1200 + report.paintArea * 450 + 500000));
+
+        const detailedMaterials = calculateDetailedMaterials(report);
+        setMaterialRequirements(detailedMaterials);
+
+        const totalMaterialCost = detailedMaterials.reduce((sum, m) => sum + m.total, 0);
+        setEstimatedCost(totalMaterialCost + 500000); // 5L baseline for labor/misc
       }
     }
   }, [layout, state.bimModel, setCostBreakdown, setEstimatedCost]);
@@ -477,6 +483,21 @@ const FloorPlanGenerator = () => {
 
     const totalValue = Object.values(breakdown).reduce((a, b) => (a as number) + (b as number), 0) as number;
     setCostBreakdown(breakdown);
+
+    // Also update materials based on area-based QTO if BIM is missing
+    const mockQTO: QTOReport = {
+      concreteVolume: totalSqFt * 0.15, // rough estimate
+      brickVolume: totalSqFt * 0.1,
+      steelEstimate: totalSqFt * 12,
+      tileArea: totalSqFt * 0.95,
+      paintArea: totalSqFt * 3.5,
+      plumbingPoints: wetRooms.length * 4,
+      totalArea: totalSqFt,
+      wetAreaCount: wetRooms.length
+    };
+    const detailedMaterials = calculateDetailedMaterials(mockQTO);
+    setMaterialRequirements(detailedMaterials);
+
     setEstimatedCost(totalValue);
 
     setScores({

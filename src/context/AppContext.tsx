@@ -44,6 +44,16 @@ export interface BIMModel {
   mep: Record<string, BIMMetadata>; // plumbing/electrical
 }
 
+export interface MaterialRequirement {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  total: number;
+  category: 'structural' | 'finishing' | 'plumbing' | 'electrical' | 'painting' | 'other';
+}
+
 interface AppState {
   totalRooms: number;
   estimatedCost: number;
@@ -69,6 +79,7 @@ interface AppState {
   };
   designStyle: string;
   complianceStatus: 'Compliant' | 'Non-Compliant' | 'Pending';
+  materialRequirements: MaterialRequirement[];
 }
 
 export interface SavedProject {
@@ -90,6 +101,7 @@ export interface SavedProject {
   estimatedCost: number;
   costBreakdown: CostBreakdown;
   complianceStatus: 'Compliant' | 'Non-Compliant' | 'Pending';
+  materialRequirements: MaterialRequirement[];
 }
 
 export interface FloorConfig {
@@ -123,6 +135,7 @@ interface AppContextType {
   resetFloorPlan: () => void;
   setFloorConfig: (config: FloorConfig) => void;
   setComplianceStatus: (status: 'Compliant' | 'Non-Compliant' | 'Pending') => void;
+  setMaterialRequirements: (requirements: MaterialRequirement[]) => void;
   chatMessages: ChatMessage[];
   addChatMessage: (msg: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
@@ -201,6 +214,7 @@ const INITIAL_STATE: AppState = {
   },
   designStyle: "Modern",
   complianceStatus: 'Pending',
+  materialRequirements: [],
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -285,6 +299,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const setComplianceStatus = useCallback((status: 'Compliant' | 'Non-Compliant' | 'Pending') =>
     setState((p) => ({ ...p, complianceStatus: status })), []);
 
+  const setMaterialRequirements = useCallback((requirements: MaterialRequirement[]) =>
+    setState((p) => ({ ...p, materialRequirements: requirements })), []);
+
   const addChatMessage = useCallback((msg: ChatMessage) => setChatMessages((prev) => [...prev, msg]), []);
 
   const updateLastAssistantMessage = useCallback((content: string) => setChatMessages((prev) => {
@@ -314,6 +331,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       estimatedCost: state.estimatedCost,
       costBreakdown: state.costBreakdown,
       complianceStatus: state.complianceStatus,
+      materialRequirements: state.materialRequirements,
     };
 
     setProjects(prev => {
@@ -357,7 +375,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       totalRooms: project.totalRooms,
       estimatedCost: project.estimatedCost,
       costBreakdown: project.costBreakdown,
-      complianceStatus: project.complianceStatus
+      complianceStatus: project.complianceStatus,
+      materialRequirements: project.materialRequirements || []
     }));
   }, [projects]);
 
@@ -366,14 +385,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     state, floorPlan, plotSize, plotWidth, plotHeight, hasFloorPlan, floorPlanSaved,
     floorConfig, landAnalysis, setLandAnalysis, setBIMMode, setBIMLayerVisibility, setBIMSelection, updateBIMMetadata,
     setTotalRooms, setEstimatedCost, setProjectMeta, setScores, setCostBreakdown,
-    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, chatMessages,
+    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, setMaterialRequirements, chatMessages,
     addChatMessage, updateLastAssistantMessage,
     projects, activeProjectId, saveProject, loadProject
   }), [
     state, floorPlan, plotSize, plotWidth, plotHeight, hasFloorPlan, floorPlanSaved,
     floorConfig, landAnalysis, setLandAnalysis, setBIMMode, setBIMLayerVisibility, setBIMSelection, updateBIMMetadata,
     setTotalRooms, setEstimatedCost, setProjectMeta, setScores, setCostBreakdown,
-    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, chatMessages,
+    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, setMaterialRequirements, chatMessages,
     addChatMessage, updateLastAssistantMessage, projects, activeProjectId, saveProject, loadProject
   ]);
 
