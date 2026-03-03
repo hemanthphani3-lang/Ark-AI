@@ -890,22 +890,8 @@ const FinalLook = () => {
 
   return (
     <div className="module-container">
-      <div className="glass-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground mb-1">Final Look — Finished Building</h2>
-            <p className="text-xs text-muted-foreground">
-              Your {numFloors}-floor building with paint, windows, and finishing. Drag to orbit, scroll to zoom.
-            </p>
-          </div>
-          <Link to="/floor-plan" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="h-3 w-3" /> Edit Floor Plan
-          </Link>
-        </div>
-      </div>
-
       {/* Controls */}
-      <div className="glass-card flex flex-wrap items-center gap-4">
+      <div className="glass-card flex flex-wrap items-center gap-4 mt-32">
         <div className="flex items-center gap-2">
           <Paintbrush className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">Paint Theme:</span>

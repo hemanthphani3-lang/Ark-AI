@@ -22,6 +22,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import AuthPage from "@/pages/AuthPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
+import Visualizer from "@/pages/Visualizer";
 
 const queryClient = new QueryClient();
 
@@ -50,8 +51,7 @@ const App = () => (
                           <Route path="/physics" element={<PhysicsEngine />} />
                           <Route path="/vastu" element={<VastuEngine />} />
                           <Route path="/compliance" element={<ComplianceCheck />} />
-                          <Route path="/visualization" element={<Visualization3D />} />
-                          <Route path="/final-look" element={<FinalLook />} />
+                          <Route path="/visualizer" element={<Visualizer />} />
                           <Route path="/reports" element={<ReportsPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
                           <Route path="*" element={<NotFound />} />

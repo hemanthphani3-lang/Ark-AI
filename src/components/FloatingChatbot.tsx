@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2, Wifi, WifiOff } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Wifi, WifiOff, Compass, ArrowRight } from "lucide-react";
 import { useAppState, ChatMessage } from "@/context/AppContext";
 import Markdown from "react-markdown";
 
@@ -255,49 +255,80 @@ export default function FloatingChatbot() {
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-2xl transition-all duration-300 hover:scale-105"
-        style={{ background: "var(--gradient-primary)" }}
+        className={`fixed bottom-10 right-10 z-50 flex h-20 w-20 items-center justify-center rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.4)] transition-all duration-700 glass-panel group overflow-hidden ${!open ? "aura-pulse" : ""
+          }`}
+        style={{
+          borderColor: "var(--logo-badge-border)",
+          background: open ? "var(--sidebar-background)" : "var(--logo-badge-bg)",
+          transform: open ? "rotate(180deg) scale(0.9)" : "rotate(0deg)"
+        }}
       >
-        {open ? <X className="h-6 w-6 text-primary-foreground" /> : <MessageCircle className="h-6 w-6 text-primary-foreground" />}
+        <div className="absolute inset-0 metallic-shimmer opacity-20 group-hover:opacity-40 transition-opacity" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+
+        {open ? (
+          <X className="h-7 w-7 text-foreground relative z-10 transition-transform duration-500" style={{ transform: "rotate(-180deg)" }} />
+        ) : (
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-150" />
+              <MessageCircle className="h-8 w-8 text-foreground relative z-10 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
+            </div>
+            <span className="text-[7px] font-black tracking-[0.4em] text-foreground/60 uppercase mt-1 ml-1">Studio</span>
+          </div>
+        )}
       </button>
 
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 rounded-xl border border-border bg-card shadow-2xl animate-fade-in flex flex-col" style={{ height: 520 }}>
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3 shrink-0">
-            <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center">
-              <MessageCircle className="h-3.5 w-3.5 text-primary" />
+        <div
+          className="fixed bottom-36 right-10 z-50 w-[420px] rounded-[2rem] border border-sidebar-border/50 bg-sidebar shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] animate-fade-in flex flex-col overflow-hidden backdrop-blur-3xl"
+          style={{ height: 620 }}
+        >
+          {/* Header */}
+          <div className="flex items-center gap-4 border-b border-sidebar-border/30 px-7 py-6 shrink-0 bg-gradient-to-b from-foreground/[0.04] to-transparent">
+            <div className="relative h-12 w-12 rounded-2xl bg-[var(--logo-badge-bg)] border border-[var(--logo-badge-border)] flex items-center justify-center overflow-hidden shadow-inner">
+              <div className="absolute inset-0 metallic-shimmer opacity-30" />
+              <img src="/ark-ai-logo.png" alt="Concierge" className="h-7 w-7 object-contain relative z-10 filter drop-shadow-md" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">ArkAI Co-Pilot</p>
-              <p className="text-[10px] text-muted-foreground">AI construction assistant</p>
+              <p className="luxury-text metallic-text text-base font-medium tracking-[0.15em]">Studio Concierge</p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className={`h-2 w-2 rounded-full ${isOnline ? "bg-success shadow-[0_0_12px_rgba(var(--success-rgb),0.6)]" : "bg-warning animate-pulse"}`} />
+                <p className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/60 uppercase">
+                  {isOnline ? "Intelligence Protocol Active" : "Local Restricted Mode"}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              {isOnline ? (
-                <span title="Connected to cloud AI">
-                  <Wifi className="h-3 w-3 text-success" />
-                </span>
-              ) : (
-                <span title="Local AI mode (offline)">
-                  <WifiOff className="h-3 w-3 text-warning" />
-                </span>
-              )}
-              <span className={`text-[9px] font-bold ${isOnline ? "text-success" : "text-warning"}`}>
-                {isOnline ? "CLOUD" : "LOCAL"}
-              </span>
-            </div>
-            {isLoading && <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />}
+            <button
+              onClick={() => setOpen(false)}
+              className="h-10 w-10 rounded-xl hover:bg-foreground/5 flex items-center justify-center transition-colors"
+            >
+              <X className="h-5 w-5 text-muted-foreground" />
+            </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+          {/* Chat Area */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4 luxury-scrollbar">
             {chatMessages.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center mt-6 space-y-2 px-4">
-                <p className="text-2xl">🏗</p>
-                <p className="font-semibold text-foreground">ArkAI Co-Pilot</p>
-                <p className="leading-relaxed">Ask me about floor plans, cost estimates, structural safety, Vastu, or building compliance.</p>
-                <div className="mt-4 space-y-1.5">
-                  {["What's my estimated cost?", "Explain my floor layout", "Vastu tips for kitchen", "Is my plan compliant?"].map(q => (
-                    <button key={q} onClick={() => { setInput(q); }} className="block w-full text-left px-3 py-1.5 rounded-lg bg-muted/60 hover:bg-muted text-[10px] font-medium text-muted-foreground hover:text-foreground transition-all border border-border">
+              <div className="text-center py-8 space-y-4 px-4">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/5 border border-primary/10 mb-2">
+                  <Compass className="h-6 w-6 text-primary opacity-40" />
+                </div>
+                <div>
+                  <h3 className="luxury-text text-xs tracking-widest text-foreground font-semibold mb-2">How may I assist your masterpiece?</h3>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[200px] mx-auto">
+                    I am trained on your specific project metadata to provide structural, financial, and Vastu intelligence.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-2 mt-6">
+                  {["What's my estimated cost?", "Vastu tips for kitchen", "Is my plan compliant?"].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => { setInput(q); }}
+                      className="px-4 py-2.5 rounded-xl bg-foreground/[0.03] hover:bg-foreground/[0.06] text-[10px] text-left text-muted-foreground hover:text-foreground transition-all border border-foreground/[0.05] group flex items-center justify-between"
+                    >
                       {q}
+                      <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-40 transition-opacity" />
                     </button>
                   ))}
                 </div>
@@ -305,10 +336,13 @@ export default function FloatingChatbot() {
             )}
             {chatMessages.map((msg, i) => (
               <div key={msg.id + i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[88%] rounded-xl px-3 py-2 text-xs leading-relaxed ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"}`}>
+                <div className={`max-w-[90%] rounded-2xl px-4 py-3 text-[11px] leading-relaxed shadow-sm ${msg.role === "user"
+                  ? "bg-primary text-primary-foreground rounded-br-none"
+                  : "bg-muted/50 text-foreground border border-border/30 rounded-bl-none"
+                  }`}>
                   {msg.role === "assistant" ? (
-                    <div className="prose prose-xs prose-invert max-w-none [&_p]:mb-1.5 [&_ul]:mb-1 [&_li]:mb-0.5 [&_strong]:text-foreground">
-                      <Markdown>{msg.content || "…"}</Markdown>
+                    <div className="prose prose-xs prose-invert max-w-none [&_p]:mb-2 [&_ul]:mb-1 [&_li]:mb-0.5 [&_strong]:text-foreground [&_strong]:font-bold">
+                      <Markdown>{msg.content || "Thinking..."}</Markdown>
                     </div>
                   ) : (
                     <span className="whitespace-pre-line">{msg.content}</span>
@@ -318,11 +352,12 @@ export default function FloatingChatbot() {
             ))}
           </div>
 
-          <div className="border-t border-border p-3 shrink-0">
-            <div className="flex gap-2">
+          {/* Input Area */}
+          <div className="p-4 border-t border-sidebar-border/50 bg-gradient-to-t from-foreground/[0.02] to-transparent">
+            <div className="relative flex items-center">
               <input
-                className="input-dark flex-1 text-xs py-2"
-                placeholder="Ask about rooms, costs, structure..."
+                className="w-full bg-foreground/[0.05] border-none rounded-xl pl-4 pr-12 py-3 text-[11px] focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground/50"
+                placeholder="Message your Studio Concierge..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
@@ -331,7 +366,7 @@ export default function FloatingChatbot() {
               <button
                 onClick={send}
                 disabled={isLoading || !input.trim()}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40"
+                className="absolute right-2 h-8 w-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-30 transition-all"
               >
                 {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               </button>

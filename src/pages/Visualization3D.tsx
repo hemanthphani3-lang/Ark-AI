@@ -348,18 +348,14 @@ export default function Visualization3D() {
 
         <gridHelper args={[50, 50, "#222", "#111"]} position={[0, -0.1, 0]} />
       </Canvas>
-      <div className="absolute top-6 left-6 z-10">
-        <h1 className="text-xl font-bold text-white tracking-widest uppercase">Structural Preview</h1>
-        <p className="text-[10px] text-primary font-bold uppercase tracking-widest mt-1">Live Architectural Engine Output</p>
-      </div>
 
       {/* 360 Control */}
-      <div className="absolute top-6 right-6 z-10 flex gap-2">
+      <div className="absolute top-[88px] right-6 z-10 flex gap-2">
         <button
           onClick={() => setAutoRotate(!autoRotate)}
           className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 ${autoRotate
-              ? "bg-primary text-primary-foreground border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.4)]"
-              : "bg-black/60 text-white/70 border-white/20 hover:border-white/40"
+            ? "bg-primary text-primary-foreground border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.4)]"
+            : "bg-black/60 text-white/70 border-white/20 hover:border-white/40"
             }`}
         >
           <Rotate3d className={`h-4 w-4 ${autoRotate ? "animate-spin-slow" : ""}`} />

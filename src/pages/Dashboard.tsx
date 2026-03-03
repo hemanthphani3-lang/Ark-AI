@@ -1,7 +1,7 @@
 import { useAppState } from "@/context/AppContext";
 import { useNavigate } from "react-router-dom";
 import {
-  Activity, Shield, Compass, Wallet, ArrowRight, MapPin, Grid3X3, Box, Eye, FolderOpen, Play
+  Activity, Shield, Compass, Wallet, ArrowRight, MapPin, Grid3X3, Box, Eye, FolderOpen, Play, Layers, FileText
 } from "lucide-react";
 import {
   RadialBarChart, RadialBar, ResponsiveContainer,
@@ -13,7 +13,7 @@ const ScoreCard = ({ label, value, icon: Icon, colorVar, description }: {
   const color = `hsl(var(${colorVar}))`;
   const data = [{ value, fill: color }];
   return (
-    <div className="glass-card flex flex-col items-center text-center py-5 px-4 relative overflow-hidden">
+    <div className="glass-card flex flex-col items-center text-center py-[var(--sp-lg)] px-[var(--sp-lg)] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: color }} />
       <div className="relative w-20 h-20 mb-3">
         <ResponsiveContainer width="100%" height="100%">
@@ -44,8 +44,8 @@ const QuickAction = ({ label, description, icon: Icon, path, locked }: {
       disabled={locked}
       className={`glass-card-hover text-left w-full group ${locked ? "opacity-30 cursor-not-allowed" : ""}`}
     >
-      <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-primary/8 p-2.5 border border-primary/10">
+      <div className="flex items-start gap-[var(--sp-md)]">
+        <div className="rounded-lg bg-primary/8 p-[var(--sp-sm)] border border-primary/10">
           <Icon className="h-4 w-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
@@ -65,92 +65,62 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="module-container max-w-6xl">
-      {/* Welcome */}
-      <div className="glass-card relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "var(--gradient-primary)" }} />
-        <div className="flex items-start gap-4">
-          <div>
-            <h2 className="text-base font-bold text-foreground mb-1 font-heading">
-              Construction Intelligence System
+    <div className="module-container max-w-7xl mx-auto space-y-[var(--sp-xl)]">
+      {/* Hero Progression */}
+      <div className="glass-card relative overflow-hidden p-[var(--sp-xl)] border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[80px] -mr-32 -mt-32" />
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest">
+              Architectural Co-Pilot Active
+            </div>
+            <h2 className="text-3xl font-black text-foreground font-heading leading-tight">
+              {floorPlanSaved ? "Your Project is Evolution-Ready" : "Let's Start Your Masterpiece"}
             </h2>
-            <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-              ArkAI acts as your co-pilot for residential construction planning — combining structural engineering,
-              geo-based land intelligence, Vastu principles, cost forecasting, and immersive 3D visualization into
-              a unified decision system. Every change cascades across all modules in real time.
+            <p className="text-sm text-muted-foreground max-w-xl">
+              ArkAI has synchronized your structural metadata. All {state.bimMode ? 'BIM' : 'Standard'} modules are ready for cross-cascading real-time analysis.
             </p>
           </div>
+          <button
+            onClick={() => navigate(floorPlanSaved ? "/visualizer" : "/land-intelligence")}
+            className="btn-primary flex items-center gap-3 px-8 py-4 whitespace-nowrap shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]"
+          >
+            <span className="uppercase tracking-widest font-black text-xs">
+              {floorPlanSaved ? "Enter Visualizer Studio" : "Begin Discovery Phase"}
+            </span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
-
-      {/* Saved Projects */}
-      {projects && projects.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <FolderOpen className="h-4 w-4 text-primary" />
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Saved Projects</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className={`glass-card p-4 border  transition-all flex flex-col gap-3 ${activeProjectId === project.id ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/30'} `}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-sm font-bold text-foreground mb-1">{project.name}</h4>
-                    <span className="text-[9px] text-muted-foreground bg-black/40 px-2 py-0.5 rounded uppercase tracking-wider">{new Date(project.dateSaved).toLocaleDateString()}</span>
-                  </div>
-                  {activeProjectId === project.id && (
-                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-1 py-3 border-y border-border/30">
-                  <div>
-                    <span className="text-[8px] uppercase text-muted-foreground font-bold tracking-wider">Rooms</span>
-                    <p className="text-xs font-mono font-bold text-foreground">{project.totalRooms}</p>
-                  </div>
-                  <div>
-                    <span className="text-[8px] uppercase text-muted-foreground font-bold tracking-wider">Area</span>
-                    <p className="text-xs font-mono font-bold text-foreground">{project.plotSize} <span className="text-[8px]">SQFT</span></p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    loadProject(project.id);
-                    navigate("/floor-plan");
-                  }}
-                  className={`w-full flex justify-center items-center gap-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-all ${activeProjectId === project.id ? 'bg-primary/20 text-primary border-primary/30' : 'bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10 hover:text-foreground'}`}
-                >
-                  <Play className="h-3 w-3" /> {activeProjectId === project.id ? 'Active Project' : 'Load Workspace'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Four Core Scores */}
-      <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">Core Scores</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <ScoreCard label="Project Health" value={floorPlanSaved ? 72 : 0} icon={Activity} colorVar="--score-health" description="Overall project viability" />
-          <ScoreCard label="Structural Safety" value={floorPlanSaved ? 85 : 0} icon={Shield} colorVar="--score-structural" description="Load & seismic analysis" />
-          <ScoreCard label="Vastu Compliance" value={floorPlanSaved ? 68 : 0} icon={Compass} colorVar="--score-vastu" description="Traditional alignment score" />
-          <ScoreCard label="Budget Stability" value={floorPlanSaved ? 91 : 0} icon={Wallet} colorVar="--score-budget" description="Cost confidence level" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+            <Activity className="h-3 w-3 text-primary" />
+            Intelligence Metrics
+          </h3>
+          <span className="text-[10px] text-muted-foreground opacity-50 uppercase tracking-widest font-bold">Real-time Syncing</span>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-[var(--sp-lg)]">
+          <ScoreCard label="Project Health" value={floorPlanSaved ? 72 : 0} icon={Activity} colorVar="--score-health" description="Overall project viability & synergy" />
+          <ScoreCard label="Structural Safety" value={floorPlanSaved ? 85 : 0} icon={Shield} colorVar="--score-structural" description="Seismic & load distribution factor" />
+          <ScoreCard label="Vastu Compliance" value={floorPlanSaved ? 68 : 0} icon={Compass} colorVar="--score-vastu" description="Traditional alignment precision" />
+          <ScoreCard label="Budget Stability" value={floorPlanSaved ? 91 : 0} icon={Wallet} colorVar="--score-budget" description="Financial confidence & BOQ health" />
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">Workflow</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <QuickAction label="Land Intelligence" description="Analyze plot risks, soil, seismic zone" icon={MapPin} path="/land-intelligence" />
-          <QuickAction label="Floor Planning" description="Configure rooms with intelligent constraints" icon={Grid3X3} path="/floor-plan" />
-          <QuickAction label="3D Visualization" description="View structural model with details" icon={Box} path="/visualization" locked={!floorPlanSaved} />
-          <QuickAction label="Final Look" description="Immersive finished interior & exterior" icon={Eye} path="/final-look" locked={!floorPlanSaved} />
+      {/* Quick Actions / Journey Map */}
+      <div className="space-y-4">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+          <Layers className="h-3 w-3 text-primary" />
+          Journey Milestones
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[var(--sp-lg)]">
+          <QuickAction label="Phase 01: Site Discovery" description="Plot risks, soil analysis, geo-intelligence" icon={MapPin} path="/land-intelligence" />
+          <QuickAction label="Phase 02: Space Planning" description="Room configuration & functional layout" icon={Grid3X3} path="/floor-plan" />
+          <QuickAction label="Phase 03: Visual Studio" description="Consolidated Structural & Aesthetic 3D" icon={Box} path="/visualizer" locked={!floorPlanSaved} />
+          <QuickAction label="Phase 04: Delivery Core" description="Certified Reports & Compliance Export" icon={FileText} path="/reports" locked={!floorPlanSaved} />
         </div>
       </div>
 

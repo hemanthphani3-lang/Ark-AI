@@ -9,20 +9,26 @@ import { useAppState } from "@/context/AppContext";
 
 const navGroups = [
   {
-    label: "Overview",
+    label: "Journey",
     items: [
       { title: "Dashboard", path: "/", icon: LayoutDashboard, locked: false },
     ],
   },
   {
-    label: "Intelligence",
+    label: "Discovery",
     items: [
       { title: "Land Intelligence", path: "/land-intelligence", icon: MapPin, locked: false },
-      { title: "Floor Planning", path: "/floor-plan", icon: Grid3X3, locked: false },
     ],
   },
   {
-    label: "Analysis",
+    label: "Studio",
+    items: [
+      { title: "Floor Planning", path: "/floor-plan", icon: Grid3X3, locked: false },
+      { title: "Visualizer", icon: Rotate3d, path: "/visualizer", locked: true },
+    ],
+  },
+  {
+    label: "Intelligence",
     items: [
       { title: "Structural Analysis", path: "/structural", icon: Building2, locked: true },
       { title: "Vastu Engine", path: "/vastu", icon: Compass, locked: true },
@@ -31,14 +37,7 @@ const navGroups = [
     ],
   },
   {
-    label: "Visualization",
-    items: [
-      { title: "3D View", icon: Rotate3d, path: "/visualization", locked: true },
-      { title: "Final Look", icon: Palette, path: "/final-look", locked: true },
-    ]
-  },
-  {
-    label: "System",
+    label: "Delivery",
     items: [
       { title: "Reports", path: "/reports", icon: FileText, locked: true },
       { title: "Settings", path: "/settings", icon: Settings, locked: false },
@@ -53,16 +52,32 @@ export default function AppSidebar() {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-250 ${collapsed ? "w-[60px]" : "w-56"
+      className={`fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-250 ${collapsed ? "w-[60px]" : "w-72"
         }`}
     >
       {/* Logo */}
-      <div className="flex h-14 items-center gap-2.5 border-b border-sidebar-border px-3">
-        <img src="/ark-ai-logo.png" alt="ArkAI Logo" className="h-8 w-8 object-contain shrink-0" />
+      <div className={`flex flex-col items-center justify-center border-b border-sidebar-border/50 py-6 transition-all duration-500 ${collapsed ? "px-2" : "px-4"}`}>
+        <div className="relative group">
+          <div className="absolute -inset-2 bg-gradient-to-b from-white/10 to-transparent rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="relative flex items-center justify-center h-12 w-12 rounded-xl bg-[var(--logo-badge-bg)] border border-[var(--logo-badge-border)] shadow-2xl backdrop-blur-sm mb-3 overflow-hidden">
+            <div className="absolute inset-0 metallic-shimmer opacity-20" />
+            <img src="/ark-ai-logo.png" alt="ArkAI Logo" className="h-7 w-7 object-contain relative z-10 filter drop-shadow-md transition-transform duration-700 group-hover:scale-110" />
+          </div>
+        </div>
+
         {!collapsed && (
-          <span className="text-base font-bold text-foreground tracking-tight font-heading">
-            Ark<span className="text-primary">AI</span>
-          </span>
+          <div className="text-center animate-fade-in">
+            <h1 className="luxury-text metallic-text text-xl font-medium tracking-[0.2em] mb-1 leading-tight">
+              ArkAI
+            </h1>
+            <div className="flex items-center justify-center gap-2 px-2">
+              <div className="h-[1px] w-4 bg-gradient-to-r from-transparent to-[var(--logo-separator)]" />
+              <span className="text-[8px] font-bold tracking-[0.3em] text-[var(--logo-subtext-color)] uppercase whitespace-nowrap">
+                Private Studio
+              </span>
+              <div className="h-[1px] w-4 bg-gradient-to-l from-transparent to-[var(--logo-separator)]" />
+            </div>
+          </div>
         )}
       </div>
 
