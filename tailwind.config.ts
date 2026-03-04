@@ -16,8 +16,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Manrope", "Inter", "system-ui", "-apple-system", "sans-serif"],
-        heading: ["Manrope", "system-ui", "sans-serif"],
+        sans: ["Poppins", "Manrope", "Inter", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["Cormorant Garamond", "serif"],
+        heading: ["Playfair Display", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",

@@ -794,7 +794,7 @@ const FinalLook = () => {
     const floor = Math.floor(pos.y / 1.0);
     const floorRooms = floorPlan.filter(r => r.floor === floor);
 
-    let finalPos = pos.clone();
+    const finalPos = pos.clone();
 
     // Check if internal: Is there a room on BOTH sides of the hit?
     const normalOffset = 0.1 / scaleFactor;
@@ -853,17 +853,6 @@ const FinalLook = () => {
     setCustomWindows(prev => prev.filter(w => w.id !== id));
   };
 
-  if (!floorPlanSaved) {
-    return (
-      <div className="module-container">
-        <div className="glass-card text-center py-16">
-          <p className="text-muted-foreground mb-4">Save a floor plan first to see the final 3D output.</p>
-          <Link to="/floor-plan" className="btn-primary inline-block">Go to Floor Plan Generator</Link>
-        </div>
-      </div>
-    );
-  }
-
   const numFloors = floorConfig?.numFloors || 1;
   const scaleFactor = 0.1;
 
@@ -887,6 +876,17 @@ const FinalLook = () => {
   const offsetX = houseBounds.centerX * scaleFactor;
   const offsetZ = houseBounds.centerY * scaleFactor;
   const camD = Math.max(houseBounds.width, houseBounds.height) * 0.08 + 6;
+
+  if (!floorPlanSaved) {
+    return (
+      <div className="module-container">
+        <div className="glass-card text-center py-16">
+          <p className="text-muted-foreground mb-4">Save a floor plan first to see the final 3D output.</p>
+          <Link to="/floor-plan" className="btn-primary inline-block">Go to Floor Plan Generator</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="module-container">

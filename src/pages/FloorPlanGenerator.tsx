@@ -376,7 +376,7 @@ const FloorPlanGenerator = () => {
   // Helper to keep total floor area constant by redistributing changes
   const rebalanceRooms = (rooms: FloorRoomConfig, targetTotal: number, changedIdx: number): FloorRoomConfig => {
     const minSizes = rooms.map(r => r.name.toLowerCase().includes('bath') ? 20 : 40);
-    let nextFloor = rooms.map(r => ({ ...r }));
+    const nextFloor = rooms.map(r => ({ ...r }));
 
     let currentTotal = nextFloor.reduce((s, r) => s + r.sizeSqFt, 0);
     let diff = targetTotal - currentTotal;
@@ -593,7 +593,7 @@ const FloorPlanGenerator = () => {
 
           let area = 0;
           for (let i = 0; i < newPoly.length; i++) {
-            let j = (i + 1) % newPoly.length;
+            const j = (i + 1) % newPoly.length;
             area += newPoly[i].x * newPoly[j].y;
             area -= newPoly[j].x * newPoly[i].y;
           }
@@ -622,10 +622,10 @@ const FloorPlanGenerator = () => {
           const pt2 = newPoly[p2];
 
           // Predicted positions
-          let nx1 = pt1.x + dx;
-          let ny1 = pt1.y + dy;
-          let nx2 = pt2.x + dx;
-          let ny2 = pt2.y + dy;
+          const nx1 = pt1.x + dx;
+          const ny1 = pt1.y + dy;
+          const nx2 = pt2.x + dx;
+          const ny2 = pt2.y + dy;
 
           // Clamp dx/dy so both points stay within [0, plotW] and [0, plotH]
           if (nx1 < 0) dx -= nx1;
@@ -643,7 +643,7 @@ const FloorPlanGenerator = () => {
 
           let area = 0;
           for (let i = 0; i < newPoly.length; i++) {
-            let j = (i + 1) % newPoly.length;
+            const j = (i + 1) % newPoly.length;
             area += newPoly[i].x * newPoly[j].y;
             area -= newPoly[j].x * newPoly[i].y;
           }

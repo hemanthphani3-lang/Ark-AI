@@ -5,8 +5,36 @@ import Markdown from "react-markdown";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
+/* ─── Types ─── */
+interface ChatContext {
+  hasFloorPlan: boolean;
+  floorPlan: any[]; // Using any[] here as RoomData might be complex, but we can refine if needed
+  rooms: number;
+  floors: number;
+  plotSize: number;
+  totalCost: number;
+  costBreakdown: {
+    foundation: number;
+    structural: number;
+    finishing: number;
+    painting: number;
+    electrical: number;
+    plumbing: number;
+    miscellaneous: number;
+  };
+  compliance: string;
+  scores: {
+    vastu: number;
+    structural: number;
+  };
+  projectMeta: {
+    facing: string;
+    vastuMode: string;
+  };
+}
+
 /* ─── Local Fallback AI ─── */
-function getLocalAnswer(userText: string, ctx: any): string {
+function getLocalAnswer(userText: string, ctx: ChatContext): string {
   const q = userText.toLowerCase();
 
   if (q.includes("cost") || q.includes("price") || q.includes("budget") || q.includes("estimat")) {
@@ -27,15 +55,15 @@ function getLocalAnswer(userText: string, ctx: any): string {
 
   if (q.includes("room") || q.includes("bedroom") || q.includes("floor plan") || q.includes("layout")) {
     if (!ctx.hasFloorPlan) return "You haven't generated a floor plan yet. Go to **Floor Planning** to configure your plot dimensions and room layout. I'll analyze it once it's ready!";
-    const roomList = ctx.floorPlan.map((r: any) => `- **${r.name}**: ${r.width.toFixed(1)}' x ${r.height.toFixed(1)}' (${r.area.toFixed(1)} sq ft)`).join("\n");
+    const roomList = ctx.floorPlan.map((r) => `- **${r.name}**: ${r.width.toFixed(1)}' x ${r.height.toFixed(1)}' (${r.area.toFixed(1)} sq ft)`).join("\n");
     return `Your current plan has **${ctx.rooms} rooms** across **${ctx.floors} floor(s)** on **${ctx.plotSize} sq ft** plot.
 
 **Detailed Room List:**
 ${roomList}
 
 **Zone Summary:**
-- Central circulation is handled via ${ctx.floorPlan.find((r: any) => r.name.includes("Living")) ? "the Living Room hub" : "a central corridor"}.
-- Wet areas (Bathrooms/Kitchen) are ${ctx.floorPlan.filter((r: any) => r.isWetArea).length > 0 ? "identified for plumbing optimization" : "pending placement"}.`;
+- Central circulation is handled via ${ctx.floorPlan.find((r) => r.name.includes("Living")) ? "the Living Room hub" : "a central corridor"}.
+- Wet areas (Bathrooms/Kitchen) are ${ctx.floorPlan.filter((r) => r.isWetArea).length > 0 ? "identified for plumbing optimization" : "pending placement"}.`;
   }
 
   if (q.includes("vastu") || q.includes("direction") || q.includes("facing")) {
@@ -135,8 +163,9 @@ async function streamChatOnline({
     }
     onDone();
     return true;
-  } catch (e: any) {
-    onError(e?.name === "AbortError" ? "timeout" : "network_error");
+  } catch (e) {
+    const error = e as Error;
+    onError(error.name === "AbortError" ? "timeout" : "network_error");
     return false;
   }
 }
