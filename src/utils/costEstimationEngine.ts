@@ -5,7 +5,24 @@ import { MaterialRequirement } from '../context/AppContext';
  * Material Rates (Average Market Rates)
  * These can be updated to "real-time" via API in the future
  */
-const RATES = {
+export interface MaterialRates {
+    CEMENT: number;
+    STEEL: number;
+    BRICKS: number;
+    SAND: number;
+    AGGREGATE: number;
+    PAINT: number;
+    TILES: number;
+    PIPES: number;
+    FITTINGS: number;
+    WIRE: number;
+    SWITCHES: number;
+}
+
+/**
+ * Material Rates (Average Market Rates)
+ */
+export const DEFAULT_RATES: MaterialRates = {
     CEMENT: 450,        // Per 50kg bag
     STEEL: 72,         // Per kg
     BRICKS: 9,         // Per brick
@@ -34,8 +51,9 @@ const BRICKWORK_MIX = {
     SAND_CFT_PER_M3: 4.5,
 };
 
-export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[] {
+export function calculateDetailedMaterials(qto: QTOReport, customRates?: MaterialRates): MaterialRequirement[] {
     const reqs: MaterialRequirement[] = [];
+    const rates = customRates || DEFAULT_RATES;
 
     // 1. Structural Materials (Concrete based)
     const structuralCement = qto.concreteVolume * CONCRETE_MIX.CEMENT_BAGS_PER_M3;
@@ -58,8 +76,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Cement (OPC/PPC)',
         quantity: totalCementBags,
         unit: 'Bags',
-        rate: RATES.CEMENT,
-        total: totalCementBags * RATES.CEMENT,
+        rate: rates.CEMENT,
+        total: totalCementBags * rates.CEMENT,
         category: 'structural'
     });
 
@@ -68,8 +86,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'TMT Steel Bars',
         quantity: Math.round(steelWeight),
         unit: 'Kg',
-        rate: RATES.STEEL,
-        total: Math.round(steelWeight) * RATES.STEEL,
+        rate: rates.STEEL,
+        total: Math.round(steelWeight) * rates.STEEL,
         category: 'structural'
     });
 
@@ -78,9 +96,9 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'First Class Red Bricks',
         quantity: Math.round(bricksCount),
         unit: 'Nos',
-        rate: RATES.BRICKS,
-        total: Math.round(bricksCount) * RATES.BRICKS,
-        category: 'structural'
+        rate: rates.BRICKS,
+        total: Math.round(bricksCount) * rates.BRICKS,
+        category: 'brickwork'
     });
 
     reqs.push({
@@ -88,8 +106,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Coarse Sand (M-Sand)',
         quantity: totalSandCft,
         unit: 'Cu.Ft',
-        rate: RATES.SAND,
-        total: totalSandCft * RATES.SAND,
+        rate: rates.SAND,
+        total: totalSandCft * rates.SAND,
         category: 'structural'
     });
 
@@ -98,8 +116,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Crushed Aggregate (20mm)',
         quantity: totalAggregateCft,
         unit: 'Cu.Ft',
-        rate: RATES.AGGREGATE,
-        total: totalAggregateCft * RATES.AGGREGATE,
+        rate: rates.AGGREGATE,
+        total: totalAggregateCft * rates.AGGREGATE,
         category: 'structural'
     });
 
@@ -112,8 +130,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Premium Interior Paint',
         quantity: paintLiters,
         unit: 'Liters',
-        rate: RATES.PAINT,
-        total: paintLiters * RATES.PAINT,
+        rate: rates.PAINT,
+        total: paintLiters * rates.PAINT,
         category: 'painting'
     });
 
@@ -122,9 +140,9 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Vitrified Floor Tiles',
         quantity: tilesSqFt,
         unit: 'Sq.Ft',
-        rate: RATES.TILES,
-        total: tilesSqFt * RATES.TILES,
-        category: 'finishing'
+        rate: rates.TILES,
+        total: tilesSqFt * rates.TILES,
+        category: 'flooring'
     });
 
     // 4. Plumbing Materials
@@ -136,8 +154,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'CPVC/PVC Plumbing Pipes',
         quantity: pipeMeters,
         unit: 'Meters',
-        rate: RATES.PIPES,
-        total: pipeMeters * RATES.PIPES,
+        rate: rates.PIPES,
+        total: pipeMeters * rates.PIPES,
         category: 'plumbing'
     });
 
@@ -146,8 +164,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Taps & Sanitary Fittings',
         quantity: wetAreas,
         unit: 'Sets',
-        rate: RATES.FITTINGS,
-        total: wetAreas * RATES.FITTINGS,
+        rate: rates.FITTINGS,
+        total: wetAreas * rates.FITTINGS,
         category: 'plumbing'
     });
 
@@ -160,8 +178,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Copper Wiring (FR/LHS)',
         quantity: wireCoils,
         unit: 'Coils',
-        rate: RATES.WIRE,
-        total: wireCoils * RATES.WIRE,
+        rate: rates.WIRE,
+        total: wireCoils * rates.WIRE,
         category: 'electrical'
     });
 
@@ -170,8 +188,8 @@ export function calculateDetailedMaterials(qto: QTOReport): MaterialRequirement[
         name: 'Modular Switches & Plates',
         quantity: switchesCount,
         unit: 'Nos',
-        rate: RATES.SWITCHES,
-        total: switchesCount * RATES.SWITCHES,
+        rate: rates.SWITCHES,
+        total: switchesCount * rates.SWITCHES,
         category: 'electrical'
     });
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppState } from "@/context/AppContext";
 import { FileText, Coins, Shield, Compass, CheckSquare, Download, AlertTriangle, TrendingUp, Home, Box } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -16,7 +17,8 @@ const COST_COLORS: Record<string, string> = {
 };
 
 const ReportsPage = () => {
-  const { state, hasFloorPlan, floorPlanSaved, plotSize, floorConfig, floorPlan } = useAppState();
+  const { state, hasFloorPlan, floorPlanSaved, plotSize, floorConfig, floorPlan, refreshMaterialRates, landAnalysis } = useAppState();
+  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
 
   if (!hasFloorPlan) {
@@ -183,8 +185,34 @@ const ReportsPage = () => {
             Estimated quantities
           </span>
         </div>
+
+        {/* Live Rates Sync Block */}
+        <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl border border-primary/20 bg-primary/5 mb-8 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary-rgb),0.6)]" />
+            <div>
+              <p className="text-[10px] font-bold text-foreground uppercase tracking-widest">Live Market Rates</p>
+              <p className="text-[9px] text-muted-foreground uppercase leading-none mt-1">
+                {landAnalysis?.address ? `Synced for ${landAnalysis.address.split(',')[0]} 🌍` : 'Using Regional Standard Averages 📏'}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={async () => {
+              setRefreshing(true);
+              await refreshMaterialRates();
+              setRefreshing(false);
+            }}
+            disabled={refreshing}
+            className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary text-primary-foreground text-[10px] font-black uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-primary/20"
+          >
+            {refreshing ? <TrendingUp className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
+            {refreshing ? "Fetching Real-Time Rates..." : "Sync with Gemini AI"}
+          </button>
+        </div>
+
         <div className="space-y-8">
-          {['structural', 'plumbing', 'electrical', 'painting', 'finishing', 'other'].map((cat) => {
+          {['structural', 'brickwork', 'plumbing', 'electrical', 'painting', 'flooring', 'finishing', 'miscellaneous'].map((cat) => {
             const catMats = state.materialRequirements.filter(m => m.category === cat);
             if (catMats.length === 0) return null;
 

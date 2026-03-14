@@ -242,7 +242,7 @@ const CADCanvas: React.FC<CADCanvasProps> = ({
                                 }}
                             >
                                 {room.name}
-                                {viewMode === 'technical' && <tspan x={room.x + room.width / 2} dy={15 / zoom} fontSize={10 / zoom}>{room.area.toFixed(1)} m²</tspan>}
+                                {viewMode === 'technical' && <tspan x={room.x + room.width / 2} dy={15 / zoom} fontSize={10 / zoom}>{room.area.toFixed(1)} FT²</tspan>}
                             </text>
                         </g>
                     ))}

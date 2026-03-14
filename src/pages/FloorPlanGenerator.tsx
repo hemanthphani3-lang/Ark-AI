@@ -20,7 +20,7 @@ const DEFAULT_ROOM_NAMES = [
 ];
 
 // Per-floor room config type
-type FloorRoomConfig = { name: string; sizeSqFt: number; bathType?: 'attached' | 'common' | 'none' }[];
+type FloorRoomConfig = { name: string; sizeSqFt: number; bathType?: 'attached' | 'common' | 'none'; isFoyer?: boolean; disabled?: boolean }[];
 
 /**
  * Build a polygon for an L-shaped bedroom (rectangle minus top-right corner for attached bath).
@@ -79,6 +79,8 @@ function generateLayout(
   totalArea: number,
   numFloors: number,
   perFloorConfigs: FloorRoomConfig[],
+  stairType: 'straight' | 'l-shape' | 'u-shape' | 'dog-leg' | 'spiral' | string,
+  hasStaircase: boolean
 ): { rooms: RoomData[]; plotW: number; plotH: number; totalSqFt: number } {
   const floorSqFt = totalArea / numFloors;
   const ratio = 1.4;
@@ -90,71 +92,80 @@ function generateLayout(
   // STAIRCASE & ENTRANCE CORRIDOR (Space before entrance horizontally)
   // We allocate a fixed corridor of 6 physical feet at the bottom/front.
   const corridorDepth = 6;
-  const STAIR_W = numFloors > 1 ? plotW / 3 : 0; // Staircase gets 1/3 of that horizontal space
-  const STAIR_H = numFloors > 1 ? corridorDepth : 0;
-
-  const usablePlotH = plotH - corridorDepth;
-
   for (let floor = 0; floor < numFloors; floor++) {
-    if (numFloors > 1) {
-      rooms.push({
-        id: floor * 1000 + 999,
-        name: "Staircase",
-        x: plotW - STAIR_W,         // Right side of corridor
-        y: usablePlotH,             // Bottom section
-        width: STAIR_W,
-        height: STAIR_H,
-        color: "hsl(215, 20%, 35%)",
-        area: STAIR_W * STAIR_H,
-        floor,
-        zone: 'core',
-        polygon: organicRect(plotW - STAIR_W, usablePlotH, STAIR_W, STAIR_H, floor * 1000 + 999, { left: true, top: true }),
-      });
-    }
-
-    // The remaining 2/3 of the horizontal space is open Entrance/Corridor
-    rooms.push({
-      id: floor * 1000 + 998,
-      name: floor === 0 ? "Entrance Foyer" : "Corridor",
-      x: 0,
-      y: usablePlotH,
-      width: plotW - STAIR_W,
-      height: corridorDepth,
-      color: "hsl(215, 15%, 50%)",
-      area: (plotW - STAIR_W) * corridorDepth,
-      floor,
-      zone: 'public',
-      polygon: organicRect(0, usablePlotH, plotW - STAIR_W, corridorDepth, floor * 1000 + 998, { top: true, right: true }),
-    });
-
     const floorConfigs = perFloorConfigs[floor] || [];
     if (floorConfigs.length === 0) continue;
 
-    // Sort: living first, then bathrooms/kitchen, then bedrooms/others
-    const livingIdx = floorConfigs.findIndex(r => r.name.toLowerCase().includes("living"));
     const sorted = [...floorConfigs];
-    if (livingIdx > 0) {
-      const [lr] = sorted.splice(livingIdx, 1);
-      sorted.unshift(lr);
+
+    // Process Foyer / Corridor
+    const foyerIdx = sorted.findIndex(r => r.isFoyer);
+    let foyerCfg = foyerIdx !== -1 ? sorted.splice(foyerIdx, 1)[0] : null;
+    let foyerHeight = 0;
+
+    if (foyerCfg && !foyerCfg.disabled) {
+      foyerHeight = foyerCfg.sizeSqFt / plotW;
+      rooms.push({
+        id: floor * 1000 + 998,
+        name: foyerCfg.name,
+        x: 0,
+        y: plotH - foyerHeight, // Bottom
+        width: plotW,
+        height: foyerHeight,
+        color: "hsl(215, 15%, 50%)",
+        area: foyerCfg.sizeSqFt,
+        floor,
+        zone: 'public',
+        polygon: organicRect(0, plotH - foyerHeight, plotW, foyerHeight, floor * 1000 + 998, { bottom: true, left: true, right: true }),
+      });
     }
-    const wet = sorted.filter((_, i) => i > 0 && (sorted[i].name.toLowerCase().includes("bath") || sorted[i].name.toLowerCase().includes("kitchen")));
-    const dry = sorted.filter((_, i) => i > 0 && !sorted[i].name.toLowerCase().includes("bath") && !sorted[i].name.toLowerCase().includes("kitchen"));
-    const finalSorted = [sorted[0], ...dry, ...wet]; // dry (bedrooms) before wet so baths can attach
+
+    const usablePlotH = plotH - foyerHeight;
+
+    // Sort remaining: living first, then dry rooms (bedrooms), then wet rooms (kitchen/baths)
+    const livingIdx = sorted.findIndex(r => r.name.toLowerCase().includes("living"));
+    let livingRoomCfg = livingIdx !== -1 ? sorted.splice(livingIdx, 1)[0] : { name: "Living Room", sizeSqFt: 200, disabled: false };
+
+    const wet = sorted.filter(r => !r.disabled && (r.name.toLowerCase().includes("bath") || r.name.toLowerCase().includes("kitchen")));
+    const dry = sorted.filter(r => !r.disabled && !r.name.toLowerCase().includes("bath") && !r.name.toLowerCase().includes("kitchen"));
+    const finalSorted = [livingRoomCfg, ...dry, ...wet];
 
     const numRooms = finalSorted.length;
-    const lrWidth = plotW * 0.4;
-    const otherWidth = plotW - lrWidth;
-    const otherCount = numRooms - 1;
-    const otherHeight = otherCount > 0 ? usablePlotH / otherCount : usablePlotH;
 
-    // Identify attached-bath indices and which bedroom they attach to
-    // Strategy: for each bathroom with bathType==='attached', find the preceding bedroom
+    // Staircase allocation with exact standard dimensions
+    const getStairDims = (type: string) => {
+      switch (type) {
+        case 'straight': return { w: 14, h: 3, area: 42 }; // 14 ft long x 3 ft wide
+        case 'l-shape': return { w: 7, h: 6, area: 42 }; // 7x6 bounding box
+        case 'u-shape':
+        case 'dog-leg': return { w: 8, h: 6, area: 48 }; // 8 ft length x 6 ft total width
+        case 'spiral': return { w: 5, h: 5, area: 25 }; // 5 ft diameter
+        default: return { w: 8, h: 6, area: 48 };
+      }
+    };
+    const stairDims = hasStaircase ? getStairDims(stairType) : { w: 0, h: 0, area: 0 };
+    const stairArea = stairDims.area;
+    // Pre-reserve staircase height from right column so no room can intrude into it
+    const stairReservedH = hasStaircase ? Math.min(stairDims.h, usablePlotH) : 0;
+    const stairReservedW = hasStaircase ? Math.min(stairDims.w, plotW) : 0;
+    const totalFloorAreaActual = finalSorted.reduce((s, r) => s + r.sizeSqFt, 0) + stairArea;
+
+    // Proportional width for Living Room
+    const lrAreaRatio = livingRoomCfg.sizeSqFt / totalFloorAreaActual;
+    const lrWidth = plotW * Math.max(0.3, Math.min(0.55, lrAreaRatio * 1.5)); // Scale weight
+    const otherWidth = plotW - lrWidth;
+
+    // Right column available height = full height minus the reserved staircase height at the bottom
+    const rightColH = usablePlotH - stairReservedH;
+
+    // Proportional heights for the right-hand column
+    const otherRooms = finalSorted.slice(1);
+
+    // Identify attached-bath indices and map them to their bedrooms
     const attachedPairs: { bedI: number; bathI: number }[] = [];
     for (let i = 1; i < numRooms; i++) {
       const cfg = finalSorted[i];
-      if (!cfg) continue;
-      if (cfg.bathType === 'attached') {
-        // Find preceding bedroom (closest dry room before this index)
+      if (cfg?.bathType === 'attached') {
         for (let j = i - 1; j >= 1; j--) {
           const prev = finalSorted[j];
           if (prev && !prev.name.toLowerCase().includes('bath') && !prev.name.toLowerCase().includes('kitchen')) {
@@ -166,49 +177,52 @@ function generateLayout(
     }
     const attachedBathIndices = new Set(attachedPairs.map(p => p.bathI));
 
+    // Filter out attached baths for height distribution (they sit inside bedrooms)
+    const independentOtherRooms = otherRooms.filter((_, i) => !attachedBathIndices.has(i + 1));
+    const totalIndependentArea = independentOtherRooms.reduce((s, r) => s + r.sizeSqFt, 0) || 1;
+
     // Living Room
     rooms.push({
       id: floor * 1000,
-      name: finalSorted[0]?.name || "Living Room",
+      name: livingRoomCfg.name,
       x: 0,
       y: 0,
       width: lrWidth,
       height: usablePlotH,
       color: ROOM_COLORS[0],
-      area: finalSorted[0]?.sizeSqFt || 200,
+      area: livingRoomCfg.sizeSqFt,
       floor,
       zone: 'public',
-      // Living Room: left & top & bottom edges are exterior, RIGHT edge is shared with bedroom column
-      polygon: organicRect(0, 0, lrWidth, usablePlotH, floor * 1000, { right: true, bottom: true }),
+      polygon: organicRect(0, 0, lrWidth, usablePlotH, floor * 1000, { right: true, bottom: true, left: true, top: true }),
     });
 
-    // Attached bath size: 30% of bedroom width × 35% of bedroom height
+    // Attached bath size: constant physical dimension (e.g., 6'x8') or ratio
     const BATH_W_RATIO = 0.35;
-    const BATH_H_RATIO = 0.40;
+    const BATH_H_RATIO = 0.35;
 
-    // Other rooms placed on right side
+    let currentY = 0;
     for (let i = 1; i < numRooms; i++) {
       const cfg = finalSorted[i];
-      if (!cfg) continue;
-      if (attachedBathIndices.has(i)) continue; // skip — will be rendered with its bedroom
+      if (!cfg || attachedBathIndices.has(i)) continue;
 
       const name = cfg.name.toLowerCase();
       let zone: 'public' | 'private' | 'service' | 'core' = 'private';
       if (name.includes('bath') || name.includes('toilet') || name.includes('utility')) zone = 'service';
       else if (name.includes('dining') || name.includes('kitchen')) zone = 'public';
 
+      // Height proportional to area — use rightColH (not usablePlotH) to stay above staircase zone
+      const rh = (cfg.sizeSqFt / totalIndependentArea) * rightColH;
       const rx = lrWidth;
-      const ry = (i - 1) * otherHeight;
+      const ry = currentY;
       const rw = otherWidth;
-      const rh = otherHeight;
       const roomId = floor * 1000 + i;
 
-      // Check if this bedroom has an attached bath
+      // Check if this room has an attached bath
       const pair = attachedPairs.find(p => p.bedI === i);
       if (pair) {
         const bathCfg = finalSorted[pair.bathI];
-        const bathW = rw * BATH_W_RATIO;
-        const bathH = rh * BATH_H_RATIO;
+        const bathW = Math.min(rw * BATH_W_RATIO, 6); // Max 6ft width for bath
+        const bathH = Math.min(rh * BATH_H_RATIO, 8); // Max 8ft length for bath
         const bathId = floor * 1000 + pair.bathI;
 
         // Bedroom as L-shape (rect minus top-right corner where bath sits)
@@ -223,7 +237,7 @@ function generateLayout(
           polygon: lShapePolygon(rx, ry, rw, rh, bathW, bathH),
         });
 
-        // Attached bathroom: small box in the top-right corner of the bedroom
+        // Attached bathroom
         rooms.push({
           id: bathId,
           name: bathCfg?.name || "Attached Bath",
@@ -236,11 +250,10 @@ function generateLayout(
           floor, zone: 'service',
           isWetArea: true,
           attachedTo: roomId,
-          // Bathroom: left edge shared with bedroom, top and right edges shared with grid
           polygon: organicRect(rx + rw - bathW, ry, bathW, bathH, bathId, { left: true, top: true, right: true }),
         });
       } else {
-        // Standard room with slight organic shape
+        // Standard room
         rooms.push({
           id: roomId,
           name: cfg.name,
@@ -251,10 +264,107 @@ function generateLayout(
           area: cfg.sizeSqFt,
           floor, zone,
           isWetArea: zone === 'service' || name.includes('kitchen'),
-          // Standard room: left edge shared with living room, top shared with room above (or top of building), bottom shared with room below
-          polygon: organicRect(rx, ry, rw, rh, roomId, { left: true, top: (i === 1), bottom: true }),
+          polygon: organicRect(rx, ry, rw, rh, roomId, { left: true, top: (currentY === 0), bottom: true }),
         });
       }
+      currentY += rh;
+    }
+
+    // Extend the last room in the right column to fill the empty space beside the staircase
+    if (hasStaircase && stairReservedW < otherWidth) {
+      const emptyW = otherWidth - stairReservedW; // width of empty area beside staircase
+      const emptyX = lrWidth;
+      const emptyY = rightColH; // starts at where rooms ended
+      const emptyH = stairReservedH;
+
+      // Find the last placed non-core room in the right column
+      const lastRightRoom = rooms.slice().reverse().find(r => r.floor === floor && r.zone !== 'core' && r.x >= lrWidth);
+      if (lastRightRoom) {
+        const rx0 = lastRightRoom.x;
+        const ry0 = lastRightRoom.y;
+        const rw0 = lastRightRoom.width;
+        const rh0 = lastRightRoom.height;
+        // L-shape: original room + extension downward (only as wide as space beside staircase)
+        lastRightRoom.polygon = [
+          { x: rx0, y: ry0 },
+          { x: rx0 + rw0, y: ry0 },
+          { x: rx0 + rw0, y: ry0 + rh0 },          // bottom-right of original room = top of staircase
+          { x: emptyX + emptyW, y: emptyY },          // step inward (top of empty area, right side)
+          { x: emptyX + emptyW, y: emptyY + emptyH }, // bottom-right of empty area
+          { x: emptyX, y: emptyY + emptyH },           // bottom-left of empty area
+          { x: emptyX, y: ry0 },                       // back up to top-left of original room
+        ];
+        lastRightRoom.height = rh0 + emptyH;
+        lastRightRoom.area += emptyW * emptyH;
+      }
+    }
+
+    // Staircase — always placed at bottom-right corner (lower-right of user's view)
+    if (hasStaircase) {
+      const sW = stairReservedW;
+      const sH = stairReservedH;
+      const sX = plotW - sW;  // right edge
+      const sY = usablePlotH - sH; // bottom edge
+
+      // Generate specific polygons based on stairType so they actually look different on the plan
+        let stairPolygon: { x: number; y: number }[] = [];
+        if (stairType === 'l-shape') {
+          // L-shape: 7x6 total bounding box, let's make the "legs" 3ft wide each
+          const legW = 3;
+          stairPolygon = [
+            { x: sX, y: sY }, // top-left of vertical leg
+            { x: sX + sW, y: sY }, // top-right
+            { x: sX + sW, y: sY + legW }, // inner notch
+            { x: sX + legW, y: sY + legW }, // inner corner
+            { x: sX + legW, y: sY + sH }, // down to bottom
+            { x: sX, y: sY + sH }, // bottom-left
+          ];
+        } else if (stairType === 'u-shape' || stairType === 'dog-leg') {
+          // U-shape: 8x6. Draw as a U with a 2ft gap in the middle if possible, or simple solid for now
+          // We will draw it as a C-shape (U rotated) opening to the left
+          const legThick = 2.5;
+          stairPolygon = [
+            { x: sX, y: sY },
+            { x: sX + sW, y: sY },
+            { x: sX + sW, y: sY + sH },
+            { x: sX, y: sY + sH },
+            { x: sX, y: sY + sH - legThick },
+            { x: sX + sW - legThick, y: sY + sH - legThick },
+            { x: sX + sW - legThick, y: sY + legThick },
+            { x: sX, y: sY + legThick },
+          ];
+        } else if (stairType === 'spiral') {
+          // Approximate a circle with an octagon for the spiral
+          const cx = sX + sW / 2;
+          const cy = sY + sH / 2;
+          const r = sW / 2;
+          stairPolygon = Array.from({ length: 8 }).map((_, i) => {
+            const angle = (i * Math.PI) / 4;
+            return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+          });
+        } else {
+          // straight or default is just the bounding box
+          stairPolygon = [
+            { x: sX, y: sY },
+            { x: sX + sW, y: sY },
+            { x: sX + sW, y: sY + sH },
+            { x: sX, y: sY + sH },
+          ];
+        }
+
+        rooms.push({
+          id: floor * 1000 + 999,
+          name: "Staircase",
+          x: sX,
+          y: sY,
+          width: sW,
+          height: sH,
+          color: "hsl(215, 20%, 35%)",
+          area: stairArea,
+          floor,
+          zone: 'core',
+          polygon: stairPolygon,
+      });
     }
   }
 
@@ -277,7 +387,8 @@ const FloorPlanGenerator = () => {
   const [plotL, setPlotL] = useState(40);
   const [plotW, setPlotWidthLocal] = useState(30);
   const [numFloors, setNumFloors] = useState(1);
-  const [stairType, setStairType] = useState<'straight' | 'l-shape' | 'u-shape' | 'dog-leg'>('dog-leg');
+  const [hasStaircase, setHasStaircase] = useState(true);
+  const [stairType, setStairType] = useState<'straight' | 'l-shape' | 'u-shape' | 'dog-leg' | 'spiral'>('dog-leg');
   // Per-floor active tab in rooms step
   const [activeConfigFloor, setActiveConfigFloor] = useState(0);
 
@@ -350,17 +461,27 @@ const FloorPlanGenerator = () => {
     if (plotL * plotW < 200) return;
     const floorArea = Math.floor(totalArea / numFloors);
     const defaultCount = 4;
-    const perRoom = Math.floor(floorArea / defaultCount);
+    const perRoom = Math.floor((floorArea - 100) / defaultCount);
 
     // Build default configs for each floor
     const configs: FloorRoomConfig[] = Array.from({ length: numFloors }, (_, fi) => {
+      const initRooms: FloorRoomConfig = [];
+      initRooms.push({
+        name: fi === 0 ? "Entrance Foyer" : "Corridor",
+        sizeSqFt: 100,
+        isFoyer: true,
+        disabled: false
+      });
       const names = fi === 0
         ? DEFAULT_ROOM_NAMES.slice(0, defaultCount)
         : ["Bedroom", "Bathroom", "Study Room", "Balcony"].slice(0, defaultCount);
-      return names.map((name, i) => ({
-        name,
-        sizeSqFt: i === defaultCount - 1 ? floorArea - perRoom * (defaultCount - 1) : perRoom,
-      }));
+      names.forEach((name, i) => {
+        initRooms.push({
+          name,
+          sizeSqFt: i === defaultCount - 1 ? (floorArea - 100) - perRoom * (defaultCount - 1) : perRoom,
+        });
+      });
+      return initRooms;
     });
     setPerFloorConfigs(configs);
     setActiveConfigFloor(0);
@@ -375,8 +496,22 @@ const FloorPlanGenerator = () => {
 
   // Helper to keep total floor area constant by redistributing changes
   const rebalanceRooms = (rooms: FloorRoomConfig, targetTotal: number, changedIdx: number): FloorRoomConfig => {
-    const minSizes = rooms.map(r => r.name.toLowerCase().includes('bath') ? 20 : 40);
+    const getMinSize = (name: string, disabled: boolean) => {
+      if (disabled) return 0;
+      const n = name.toLowerCase();
+      if (n.includes('foyer') || n.includes('corridor')) return 20;
+      if (n.includes('living')) return 120;
+      if (n.includes('bedroom')) return 90;
+      if (n.includes('kitchen')) return 70;
+      if (n.includes('bath')) return 20;
+      return 40;
+    };
     const nextFloor = rooms.map(r => ({ ...r }));
+
+    // Force disabled rooms to 0
+    nextFloor.forEach(r => { if (r.disabled) r.sizeSqFt = 0; });
+
+    const minSizes = nextFloor.map(r => getMinSize(r.name, !!r.disabled));
 
     let currentTotal = nextFloor.reduce((s, r) => s + r.sizeSqFt, 0);
     let diff = targetTotal - currentTotal;
@@ -384,7 +519,7 @@ const FloorPlanGenerator = () => {
     let iterations = 0;
     while (Math.abs(diff) > 0.1 && iterations < 10) {
       const flexibleRooms = nextFloor.filter((r, ri) => {
-        if (ri === changedIdx) return false;
+        if (ri === changedIdx || r.disabled) return false;
         if (diff > 0) return true;
         return r.sizeSqFt > minSizes[ri];
       });
@@ -404,15 +539,31 @@ const FloorPlanGenerator = () => {
       iterations++;
     }
 
-    const roundedFloor = nextFloor.map(r => ({ ...r, sizeSqFt: Math.round(r.sizeSqFt) }));
+    const roundedFloor = nextFloor.map(r => ({ ...r, sizeSqFt: Math.max(getMinSize(r.name, !!r.disabled), Math.round(r.sizeSqFt)) }));
     const roundedTotal = roundedFloor.reduce((s, r) => s + r.sizeSqFt, 0);
     if (roundedTotal !== targetTotal) {
-      const adjustIdx = roundedFloor.findIndex((r, ri) => ri !== changedIdx) !== -1
-        ? roundedFloor.findIndex((r, ri) => ri !== changedIdx)
+      const adjustIdx = roundedFloor.findIndex((r, ri) => ri !== changedIdx && !r.disabled) !== -1
+        ? roundedFloor.findIndex((r, ri) => ri !== changedIdx && !r.disabled)
         : changedIdx;
       if (adjustIdx !== -1) roundedFloor[adjustIdx].sizeSqFt += (targetTotal - roundedTotal);
     }
     return roundedFloor;
+  };
+
+  const toggleRoomDisabled = (floorIdx: number, roomIdx: number) => {
+    setPerFloorConfigs(prev => prev.map((f, fi) => {
+      if (fi !== floorIdx) return f;
+      const targetTotal = Math.floor(totalArea / numFloors);
+      const nextFloor = [...f];
+      const disabling = !nextFloor[roomIdx].disabled;
+      nextFloor[roomIdx] = { ...nextFloor[roomIdx], disabled: disabling };
+
+      if (!disabling) {
+        nextFloor[roomIdx].sizeSqFt = 80;
+      }
+
+      return rebalanceRooms(nextFloor, targetTotal, roomIdx);
+    }));
   };
 
   const confirmAddRoom = (floorIdx: number) => {
@@ -469,21 +620,6 @@ const FloorPlanGenerator = () => {
     const totalSqFt = rooms.reduce((s, r) => s + r.area, 0);
     const wetRooms = rooms.filter(r => r.isWetArea);
 
-    const breakdown: CostBreakdown = {
-      foundation: totalSqFt * 600,
-      structural: totalSqFt * 850,
-      brickwork: totalSqFt * 320,
-      electrical: totalSqFt * 160,
-      plumbing: wetRooms.length * 48000,
-      flooring: totalSqFt * 280,
-      painting: totalSqFt * 110,
-      finishing: totalSqFt * 550,
-      miscellaneous: 180000,
-    };
-
-    const totalValue = Object.values(breakdown).reduce((a, b) => (a as number) + (b as number), 0) as number;
-    setCostBreakdown(breakdown);
-
     // Also update materials based on area-based QTO if BIM is missing
     const mockQTO: QTOReport = {
       concreteVolume: totalSqFt * 0.15, // rough estimate
@@ -495,9 +631,30 @@ const FloorPlanGenerator = () => {
       totalArea: totalSqFt,
       wetAreaCount: wetRooms.length
     };
-    const detailedMaterials = calculateDetailedMaterials(mockQTO);
+    
+    // Use dynamic rates from context if available
+    const detailedMaterials = calculateDetailedMaterials(mockQTO, state.materialRates);
     setMaterialRequirements(detailedMaterials);
 
+    // Group material requirements by category for the cost breakdown
+    const breakdown: CostBreakdown = detailedMaterials.reduce((acc, req) => {
+      const cat = req.category as keyof CostBreakdown;
+      acc[cat] = (acc[cat] || 0) + req.total;
+      return acc;
+    }, {
+      foundation: totalSqFt * 600, // Derived structural base
+      structural: 0,
+      brickwork: 0,
+      electrical: 0,
+      plumbing: 0,
+      flooring: 0,
+      painting: 0,
+      finishing: 0,
+      miscellaneous: 180000,
+    } as CostBreakdown);
+
+    const totalValue = Object.values(breakdown).reduce((a, b) => (a as number) + (b as number), 0) as number;
+    setCostBreakdown(breakdown);
     setEstimatedCost(totalValue);
 
     setScores({
@@ -512,7 +669,7 @@ const FloorPlanGenerator = () => {
     // Flatten all room configs for FloorConfig
     const allRoomConfigs = perFloorConfigs.flat();
     const config: FloorConfig = { numFloors, roomConfigs: allRoomConfigs, staircaseType: stairType };
-    const result = generateLayout(totalArea, numFloors, perFloorConfigs);
+    const result = generateLayout(totalArea, numFloors, perFloorConfigs, stairType, hasStaircase);
     setLayout(result);
     setTotalRooms(result.rooms.length);
     setFloorPlan(result.rooms, result.plotW, result.plotH, result.totalSqFt);
@@ -819,19 +976,58 @@ const FloorPlanGenerator = () => {
                   </div>
                 </div>
 
-                {numFloors > 1 && (
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-muted-foreground mb-2 block">Staircase Type</label>
+                {numFloors === 1 && (
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                    <div>
+                      <label className="text-xs font-bold text-foreground block">Terrace Access (Staircase)</label>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Enable staircase for future floors or roof access.</p>
+                    </div>
+                    {/* Shadcn-like Switch */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={hasStaircase}
+                      onClick={() => setHasStaircase(!hasStaircase)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${hasStaircase ? 'bg-primary' : 'bg-muted'}`}
+                    >
+                      <span
+                        className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${hasStaircase ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </button>
+                  </div>
+                )}
+
+                {(hasStaircase || numFloors > 1) && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    <label className="text-[10px] uppercase font-bold text-muted-foreground mb-3 block flex items-center gap-2">
+                      <Layers className="w-3 h-3" />
+                      Staircase Configuration
+                    </label>
                     <div className="grid grid-cols-2 gap-2">
-                      {(['straight', 'l-shape', 'u-shape', 'dog-leg'] as const).map((type) => (
-                        <button key={type} onClick={() => setStairType(type)} className={`py-1.5 rounded-md text-[10px] font-bold transition-all border ${stairType === type ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
-                          {type.toUpperCase()}
+                      {(['straight', 'l-shape', 'u-shape', 'dog-leg', 'spiral'] as const).map((type) => (
+                        <button key={type} onClick={() => setStairType(type)} className={`py-2 rounded-md text-[10px] font-bold transition-all border ${stairType === type ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                          <div className="uppercase tracking-wider mb-0.5">{type.split('-').join(' ')}</div>
+                          <div className={`text-[9px] ${stairType === type ? 'text-primary/80' : 'text-muted-foreground/60'}`}>
+                            {(() => {
+                              switch (type) {
+                                case 'straight': return '40 FT² AREA';
+                                case 'l-shape': return '42 FT² AREA';
+                                case 'u-shape':
+                                case 'dog-leg': return '45 FT² AREA';
+                                case 'spiral': return '23 FT² AREA';
+                                default: return '';
+                              }
+                            })()}
+                          </div>
                         </button>
                       ))}
                     </div>
-                    <p className="text-[9px] text-muted-foreground mt-1 italic">Staircase occupies a compact 4ft structural strip — non-negotiable for G+1+.</p>
+                    <p className="text-[9px] text-muted-foreground mt-3 italic leading-relaxed">
+                      Staircase footprint is automatically deducted from the floor plan to ensure proper vertical circulation between levels.
+                    </p>
                   </div>
                 )}
+
               </div>
             </div>
 
@@ -882,15 +1078,43 @@ const FloorPlanGenerator = () => {
             {/* Current Floor Config */}
             <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 mb-4">
               {currentFloorConfig.map((room, idx) => (
-                <div key={idx} className="rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="flex items-center gap-3 mb-2">
+                <div key={idx} className={`rounded-lg border border-border bg-muted/40 p-3 transition-opacity ${room.disabled ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+                  <div className="flex items-center gap-3 mb-2 relative z-10">
                     <span className="h-3 w-3 rounded-sm shrink-0" style={{ background: ROOM_COLORS[idx % ROOM_COLORS.length] }} />
                     <input
                       className="input-dark flex-1 py-1.5 text-sm"
                       value={room.name}
                       onChange={(e) => updateRoomName(activeConfigFloor, idx, e.target.value)}
                     />
-                    <div className="flex items-center gap-1.5 ml-2">
+
+                    {room.isFoyer ? (
+                      <button
+                        className={`text-[10px] font-bold uppercase px-2 py-1 rounded ml-2 pointer-events-auto transition-colors ${room.disabled ? 'bg-success/20 text-success border border-success/30 hover:bg-success/30' : 'bg-muted border border-border text-muted-foreground hover:bg-muted/80'}`}
+                        onClick={() => toggleRoomDisabled(activeConfigFloor, idx)}
+                      >
+                        {room.disabled ? 'Enable' : 'Disable'}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <input
+                          type="number"
+                          className="input-dark w-[60px] py-1 px-1.5 text-xs text-right font-bold text-primary bg-primary/10 border-primary/20"
+                          value={room.sizeSqFt}
+                          onChange={(e) => updateRoomSize(activeConfigFloor, idx, parseInt(e.target.value) || 0)}
+                        />
+                        <span className="text-[10px] font-bold text-muted-foreground pt-0.5">ft²</span>
+                      </div>
+                    )}
+
+                    {currentFloorConfig.length > 2 && !room.isFoyer && (
+                      <button onClick={() => removeRoom(activeConfigFloor, idx)} className="h-6 w-6 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 flex items-center justify-center transition-all ml-1">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {room.isFoyer && !room.disabled && (
+                    <div className="flex items-center gap-1.5 ml-2 mb-2 justify-end relative z-10 pointer-events-auto">
                       <input
                         type="number"
                         className="input-dark w-[60px] py-1 px-1.5 text-xs text-right font-bold text-primary bg-primary/10 border-primary/20"
@@ -899,12 +1123,7 @@ const FloorPlanGenerator = () => {
                       />
                       <span className="text-[10px] font-bold text-muted-foreground pt-0.5">ft²</span>
                     </div>
-                    {currentFloorConfig.length > 2 && (
-                      <button onClick={() => removeRoom(activeConfigFloor, idx)} className="h-6 w-6 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 flex items-center justify-center transition-all ml-1">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
+                  )}
                   {room.name.toLowerCase().includes('bath') && (
                     <div className="flex gap-2 mb-3 mt-1">
                       {(['attached', 'common'] as const).map(type => (
@@ -1241,18 +1460,23 @@ const FloorPlanGenerator = () => {
                           />
                           {!isCore && (
                             <>
-                              <text x={cx} y={cy - 5} textAnchor="middle" fill="white" fontSize={Math.max(7, Math.min(11, rw / 6))} fontWeight={700} className="pointer-events-none select-none">
-                                {room.name.toUpperCase()}
+                              <text x={cx} y={cy - 5} textAnchor="middle" fill="white" fontSize={Math.max(6, Math.min(10, rw / 7))} fontWeight={700} className="pointer-events-none select-none">
+                                {room.name.toUpperCase().length > 15 ? room.name.toUpperCase().slice(0, 12) + "..." : room.name.toUpperCase()}
                               </text>
-                              <text x={cx} y={cy + 9} textAnchor="middle" fill="hsl(215,20%,60%)" fontSize={Math.max(6, Math.min(9, rw / 8))} className="pointer-events-none select-none">
+                              <text x={cx} y={cy + 8} textAnchor="middle" fill="hsl(215,20%,60%)" fontSize={Math.max(6, Math.min(8, rw / 9))} className="pointer-events-none select-none">
                                 {Math.round(room.area)} FT²
                               </text>
                             </>
                           )}
                           {isCore && (
-                            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill="hsl(215,20%,60%)" fontSize={7} fontWeight={700} className="pointer-events-none select-none">
-                              STAIR
-                            </text>
+                            <>
+                              <text x={cx} y={cy - 4} textAnchor="middle" dominantBaseline="middle" fill="hsl(215,20%,60%)" fontSize={7} fontWeight={700} className="pointer-events-none select-none">
+                                STAIR
+                              </text>
+                              <text x={cx} y={cy + 6} textAnchor="middle" fill="hsl(215,20%,60%)" fontSize={5.5} className="pointer-events-none select-none">
+                                {Math.round(room.area)} FT²
+                              </text>
+                            </>
                           )}
 
                           {/* Draggable segment lines (walls) */}
@@ -1448,9 +1672,8 @@ const FloorPlanGenerator = () => {
               </div>
             </div>
           </div>
-        )
-      }
-    </div >
+        )}
+    </div>
   );
 };
 

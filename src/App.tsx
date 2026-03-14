@@ -8,6 +8,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
+import ClickAnimation from "@/components/ClickAnimation";
 import Dashboard from "@/pages/Dashboard";
 import LandIntelligence from "@/pages/LandIntelligence";
 import FloorPlanGenerator from "@/pages/FloorPlanGenerator";
@@ -29,6 +30,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <ClickAnimation />
       <Toaster />
       <Sonner />
       <ThemeProvider>

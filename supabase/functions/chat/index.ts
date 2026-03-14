@@ -37,43 +37,69 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const keys = [
+      Deno.env.get("GEMINI_API_KEY_1") || Deno.env.get("GEMINI_API_KEY"),
+      Deno.env.get("GEMINI_API_KEY_2"),
+      Deno.env.get("GEMINI_API_KEY_3"),
+      Deno.env.get("GEMINI_API_KEY_4")
+    ].filter(Boolean) as string[];
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
-        ],
-        temperature: 0.9,
-        stream: true,
-      }),
-    });
+    if (keys.length === 0) throw new Error("No GEMINI_API_KEY configured");
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("OpenAI Error:", errorData);
+    let lastErrorData = null;
+    let lastStatus = 500;
+    let successfulResponse = null;
 
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    for (const apiKey of keys) {
+      try {
+        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gemini-1.5-flash",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              ...messages,
+            ],
+            temperature: 0.9,
+            stream: true,
+          }),
         });
+
+        if (response.ok) {
+          successfulResponse = response;
+          break; // Success! Exit the loop.
+        }
+
+        const errorData = await response.json().catch(() => ({}));
+        lastErrorData = errorData;
+        lastStatus = response.status;
+        console.warn(`Key failed with status ${response.status}`);
+
+        // If it's a Bad Request (e.g. invalid messages format), switching keys won't help
+        if (response.status === 400) {
+          break;
+        }
+        // Otherwise (429 Rate Limit, 401/403 Invalid or Out of Quota, 5xx server error), try the next key
+      } catch (err) {
+        console.warn("Fetch exception with a key:", err);
       }
-      return new Response(JSON.stringify({ error: "AI service unavailable" }), {
-        status: 500,
+    }
+
+    if (!successfulResponse) {
+      console.error("All AI API keys failed. Last error:", lastErrorData);
+      return new Response(JSON.stringify({ 
+        error: "All AI keys failed or rate limit exceeded. Please try again later." 
+      }), {
+        status: lastStatus,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
+    return new Response(successfulResponse.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

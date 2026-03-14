@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo, useEffect } from "react";
+import { MaterialRates, DEFAULT_RATES, calculateDetailedMaterials } from "../utils/costEstimationEngine";
+import { fetchMaterialRates } from "../services/aiService";
+import { calculateQTO } from "../utils/bimEngine";
 
 export interface RoomData {
   id: number;
@@ -51,7 +54,7 @@ export interface MaterialRequirement {
   unit: string;
   rate: number;
   total: number;
-  category: 'structural' | 'finishing' | 'plumbing' | 'electrical' | 'painting' | 'other';
+  category: 'structural' | 'brickwork' | 'flooring' | 'finishing' | 'plumbing' | 'electrical' | 'painting' | 'miscellaneous';
 }
 
 interface AppState {
@@ -79,6 +82,7 @@ interface AppState {
   };
   designStyle: string;
   complianceStatus: 'Compliant' | 'Non-Compliant' | 'Pending';
+  materialRates: MaterialRates;
   materialRequirements: MaterialRequirement[];
 }
 
@@ -101,13 +105,14 @@ export interface SavedProject {
   estimatedCost: number;
   costBreakdown: CostBreakdown;
   complianceStatus: 'Compliant' | 'Non-Compliant' | 'Pending';
+  materialRates: MaterialRates;
   materialRequirements: MaterialRequirement[];
 }
 
 export interface FloorConfig {
   numFloors: number;
   roomConfigs: { name: string; sizeSqFt: number; hasAttachedBath?: boolean }[];
-  staircaseType?: 'straight' | 'l-shape' | 'u-shape' | 'dog-leg';
+  staircaseType?: 'straight' | 'l-shape' | 'u-shape' | 'dog-leg' | 'spiral';
 }
 
 interface AppContextType {
@@ -136,6 +141,7 @@ interface AppContextType {
   setFloorConfig: (config: FloorConfig) => void;
   setComplianceStatus: (status: 'Compliant' | 'Non-Compliant' | 'Pending') => void;
   setMaterialRequirements: (requirements: MaterialRequirement[]) => void;
+  refreshMaterialRates: (location?: string) => Promise<void>;
   chatMessages: ChatMessage[];
   addChatMessage: (msg: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
@@ -214,6 +220,7 @@ const INITIAL_STATE: AppState = {
   },
   designStyle: "Modern",
   complianceStatus: 'Pending',
+  materialRates: DEFAULT_RATES,
   materialRequirements: [],
 };
 
@@ -281,7 +288,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setPlotHeight(ph);
     setPlotSize(plotSqFt);
     setFloorPlanSaved(false);
-  }, []);
+
+    // Calculate initial material requirements and cost
+    const qto = calculateQTO(rooms, state.bimModel);
+    const reqs = calculateDetailedMaterials(qto, state.materialRates);
+    const total = reqs.reduce((acc, curr) => acc + curr.total, 0);
+
+    setState(prev => ({
+      ...prev,
+      materialRequirements: reqs,
+      estimatedCost: total
+    }));
+  }, [state.bimModel, state.materialRates]);
 
   const saveFloorPlan = useCallback(() => setFloorPlanSaved(true), []);
 
@@ -303,6 +321,50 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((p) => ({ ...p, materialRequirements: requirements })), []);
 
   const addChatMessage = useCallback((msg: ChatMessage) => setChatMessages((prev) => [...prev, msg]), []);
+
+  const refreshMaterialRates = useCallback(async (location?: string) => {
+    try {
+      const loc = location || landAnalysis?.address || "Global Average";
+      const newRates = await fetchMaterialRates(loc);
+      setState(prev => {
+        const updatedRates = { ...prev.materialRates, ...newRates };
+        const totalSqFt = floorPlan.reduce((s, r) => s + r.area, 0);
+        
+        // Re-calculate material requirements with new rates
+        const qto = calculateQTO(floorPlan, prev.bimModel);
+        const newReqs = calculateDetailedMaterials(qto, updatedRates);
+        
+        // Group material requirements by category for the cost breakdown
+        const newBreakdown: CostBreakdown = newReqs.reduce((acc, req) => {
+          const cat = req.category as keyof CostBreakdown;
+          acc[cat] = (acc[cat] || 0) + req.total;
+          return acc;
+        }, {
+          foundation: totalSqFt * 600,
+          structural: 0,
+          brickwork: 0,
+          electrical: 0,
+          plumbing: 0,
+          flooring: 0,
+          painting: 0,
+          finishing: 0,
+          miscellaneous: 180000,
+        } as CostBreakdown);
+
+        const newTotal = Object.values(newBreakdown).reduce((a, b) => a + b, 0);
+        
+        return {
+          ...prev,
+          materialRates: updatedRates,
+          materialRequirements: newReqs,
+          costBreakdown: newBreakdown,
+          estimatedCost: newTotal
+        };
+      });
+    } catch (e) {
+      console.error("Failed to refresh rates:", e);
+    }
+  }, [landAnalysis, floorPlan]);
 
   const updateLastAssistantMessage = useCallback((content: string) => setChatMessages((prev) => {
     const last = prev[prev.length - 1];
@@ -331,6 +393,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       estimatedCost: state.estimatedCost,
       costBreakdown: state.costBreakdown,
       complianceStatus: state.complianceStatus,
+      materialRates: state.materialRates,
       materialRequirements: state.materialRequirements,
     };
 
@@ -376,6 +439,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       estimatedCost: project.estimatedCost,
       costBreakdown: project.costBreakdown,
       complianceStatus: project.complianceStatus,
+      materialRates: project.materialRates || DEFAULT_RATES,
       materialRequirements: project.materialRequirements || []
     }));
   }, [projects]);
@@ -385,14 +449,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     state, floorPlan, plotSize, plotWidth, plotHeight, hasFloorPlan, floorPlanSaved,
     floorConfig, landAnalysis, setLandAnalysis, setBIMMode, setBIMLayerVisibility, setBIMSelection, updateBIMMetadata,
     setTotalRooms, setEstimatedCost, setProjectMeta, setScores, setCostBreakdown,
-    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, setMaterialRequirements, chatMessages,
+    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, setMaterialRequirements, refreshMaterialRates, chatMessages,
     addChatMessage, updateLastAssistantMessage,
     projects, activeProjectId, saveProject, loadProject
   }), [
     state, floorPlan, plotSize, plotWidth, plotHeight, hasFloorPlan, floorPlanSaved,
     floorConfig, landAnalysis, setLandAnalysis, setBIMMode, setBIMLayerVisibility, setBIMSelection, updateBIMMetadata,
     setTotalRooms, setEstimatedCost, setProjectMeta, setScores, setCostBreakdown,
-    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, setMaterialRequirements, chatMessages,
+    setFloorPlan, saveFloorPlan, resetFloorPlan, setFloorConfig, setComplianceStatus, setMaterialRequirements, refreshMaterialRates, chatMessages,
     addChatMessage, updateLastAssistantMessage, projects, activeProjectId, saveProject, loadProject
   ]);
 
